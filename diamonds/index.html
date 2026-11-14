@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diamond Isles</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>💎 Diamond Isles 💎</h1>
+
+    <div class="hud">
+      <span id="island-name"></span>
+      <span id="diamond-count"></span>
+    </div>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden>Space: Talk to Bobby</p>
+      <div id="dialogue" hidden>
+        <p class="name">Bobby</p>
+        <p id="dialogue-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+      <div id="fade"></div>
+      <div id="win" hidden>
+        <h2>🏆 You did it! 🏆</h2>
+        <p>You found every diamond on every island, even on massive Dusk Island!</p>
+        <button id="close-win">Keep exploring</button>
+      </div>
+    </div>
+
+    <p class="help">Arrow keys or WASD to explore. Space to talk. You can climb one step at a time.</p>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Map</h2>
+        <canvas id="minimap" width="184" height="184"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Islands</h2>
+        <div id="island-buttons"></div>
+        <button id="new-game" class="small">Start a new game</button>
+      </div>
+      <div class="panel">
+        <h2>Bag</h2>
+        <div id="bag"></div>
+      </div>
+    </div>
+
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="sprites.js"></script>
+    <script src="islands.js"></script>
+    <script src="render.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
