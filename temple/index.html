@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Temple Guardian</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>🏛️ Temple Guardian 🏛️</h1>
+
+    <div class="hud">
+      <span id="hearts"></span>
+      <span id="place"></span>
+      <span id="weapon"></span>
+      <button id="pause-button">⏸ Pause</button>
+      <a class="button-link" href="builder.html">🏗️ Free Play</a>
+    </div>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <!-- The HD-2D look: blurry top and bottom (tilt-shift) and soft dark corners -->
+      <div class="tilt top"></div>
+      <div class="tilt bottom"></div>
+      <div class="vignette"></div>
+      <div id="hurt"></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <div id="dialogue" hidden>
+        <p id="dialogue-name"></p>
+        <p id="dialogue-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="big-news" class="overlay" hidden>
+        <p id="big-news-text"></p>
+        <button id="close-news">OK!</button>
+      </div>
+
+      <div id="paused" class="overlay" hidden>
+        <h2>⏸ Paused</h2>
+        <p>Take a break! The Gloom will wait.</p>
+        <p class="keys">Press P or Escape to keep playing</p>
+        <button id="resume">▶ Resume</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2>Temple Guardian</h2>
+        <p>The secret temples of the mountains are being destroyed!</p>
+        <p>Shadowy creatures called the Gloom are pouring out of dark rifts. Only you can stop them.</p>
+        <p>Talk to the Temple Spirit at the Mountain Temple, just north of your camp.</p>
+        <p class="keys">Arrows / WASD: walk, fight, chop and mine &nbsp; Space: use &nbsp; Q: heal &nbsp; P: pause</p>
+        <button id="start">Start</button>
+      </div>
+    </div>
+
+    <p class="help">Walk into monsters to fight them, and into trees and rocks to gather. Walk into water to swim: the Gloom can't swim!</p>
+
+    <div class="panels">
+      <div class="panel wide" id="freeplay" hidden>
+        <h2>⭐ Quests &amp; Lands ⭐</h2>
+        <h3>Quests</h3>
+        <ul id="quest-list"></ul>
+        <h3>Characters</h3>
+        <div id="character-list"></div>
+        <h3>Travel</h3>
+        <div id="travel-list"></div>
+      </div>
+      <div class="panel wide">
+        <h2>Crafting</h2>
+        <div id="craft-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Bag</h2>
+        <div id="bag-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Temples</h2>
+        <div id="temple-list"></div>
+        <h2 class="map-title">Map</h2>
+        <canvas id="minimap" width="192" height="192"></canvas>
+        <button id="new-game" class="small">Start a new game</button>
+      </div>
+    </div>
+
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="sprites.js"></script>
+    <script src="world.js"></script>
+    <script src="render.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>

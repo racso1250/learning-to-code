@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Great Land</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body class="great-land">
+    <h1>🏗️ The Great Land 🏗️</h1>
+
+    <div class="hud">
+      <span id="rank"></span>
+      <span id="people"></span>
+      <span id="weapon"></span>
+      <a class="button-link" href="index.html">⬅ Temples</a>
+    </div>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div class="tilt top"></div>
+      <div class="tilt bottom"></div>
+      <div class="vignette"></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <div id="big-news" class="overlay" hidden>
+        <p id="big-news-text"></p>
+        <button id="close-news">OK!</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2>The Great Land</h2>
+        <p>Welcome to Free Play! This massive land is peaceful: nothing can hurt you here.</p>
+        <p>Gather materials, fix the old ruins, and build villages. Build a boat to sail to the islands!</p>
+        <p>The more people live in your land, the higher your rank. Every new rank gives you a new costume and a new weapon.</p>
+        <p class="keys">Arrows / WASD: walk and gather &nbsp; B: build &nbsp; Space: fix ruins and talk</p>
+        <button id="start">Start building</button>
+      </div>
+    </div>
+
+    <p class="help">Pick a building below, face an empty patch of land and press B to build it. Walk up to a ruin and press Space to fix it.</p>
+
+    <div class="panels">
+      <div class="panel wide">
+        <h2>Build</h2>
+        <div id="build-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Bag</h2>
+        <div id="bag-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Ranks</h2>
+        <ul id="rank-list"></ul>
+      </div>
+      <div class="panel wide">
+        <h2>Map</h2>
+        <canvas id="minimap" class="big-map" width="240" height="240"></canvas>
+        <button id="new-game" class="small">Start the Great Land again</button>
+      </div>
+    </div>
+
+    <p><a href="index.html">Back to the temples</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="sprites.js"></script>
+    <script src="world.js"></script>
+    <script src="render.js"></script>
+    <script src="builder.js"></script>
+  </body>
+</html>
