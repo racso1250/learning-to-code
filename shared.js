@@ -264,7 +264,9 @@ const characters = {
 
 // ----- Drawing -----
 
-// Draw an 8x8 sprite with its top-left corner at screen position (x, y)
+// Draw an 8x8 sprite flat (2D) with its top-left corner at screen position (x, y).
+// The game itself is 3D now (see render3d.js), but the character picker
+// buttons still use this to show little pictures.
 function drawSprite(ctx, sprite, x, y) {
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {
@@ -275,22 +277,6 @@ function drawSprite(ctx, sprite, x, y) {
       }
     }
   }
-}
-
-// Draw a patch of carpet floor at screen position (x, y).
-// tileX and tileY are where it is on the map, for the checkerboard pattern.
-function drawFloor(ctx, tileX, tileY, x, y) {
-  if ((tileX + tileY) % 2 === 0) {
-    ctx.fillStyle = "#8c1c3a";
-  } else {
-    ctx.fillStyle = "#7a1832";
-  }
-  ctx.fillRect(x, y, TILE, TILE);
-
-  // Add a few little dots for carpet texture
-  ctx.fillStyle = "#a8284a";
-  ctx.fillRect(x + 8, y + 8, PIXEL, PIXEL);
-  ctx.fillRect(x + 20, y + 20, PIXEL, PIXEL);
 }
 
 // ----- Dust bunny brains -----

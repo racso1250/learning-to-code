@@ -14,8 +14,7 @@
       <span id="crumbs">Crumbs: 0</span>
     </div>
 
-    <!-- 15 tiles wide x 11 tiles tall, 32 pixels each -->
-    <canvas id="game" width="480" height="352"></canvas>
+    <canvas id="game"></canvas>
 
     <p id="message">Collect all the crumbs!</p>
     <p class="help">Arrow keys or WASD to move. R to restart the level.</p>
@@ -24,9 +23,12 @@
 
     <p><a href="index.html">Back to the arcade</a></p>
 
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="shared.js"></script>
     <script src="levels.js"></script>
     <script src="sounds.js"></script>
+    <script src="render3d.js"></script>
     <script src="carpet.js"></script>
   </body>
 </html>

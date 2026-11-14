@@ -23,7 +23,7 @@
         <span id="crumbs">Crumbs eaten: 0</span>
       </div>
 
-      <canvas id="game" width="480" height="352"></canvas>
+      <canvas id="game"></canvas>
 
       <p id="message">Explore the giant carpet!</p>
       <p class="help">Arrow keys or WASD to move.</p>
@@ -48,9 +48,12 @@
 
     <p><a href="carpet.html">Back to the levels</a></p>
 
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="shared.js"></script>
     <script src="world.js"></script>
     <script src="sounds.js"></script>
+    <script src="render3d.js"></script>
     <script src="freeplay.js"></script>
   </body>
 </html>

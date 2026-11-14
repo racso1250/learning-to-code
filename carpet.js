@@ -3,9 +3,9 @@
 
 // ----- Setup -----
 
-// The canvas is like a drawing board we can paint on with code
+// The 3D view draws the game onto this canvas (see render3d.js)
 const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const view = createView(canvas, { follow: false });
 
 // Load the save, so we know which character you picked
 const save = loadGame();
@@ -68,32 +68,16 @@ function loadLevel(number) {
 
 // ----- Drawing -----
 
-// Draw the whole level
+// Draw the whole level in 3D
 function draw() {
-  for (let y = 0; y < map.length; y++) {
-    for (let x = 0; x < map[y].length; x++) {
-      drawFloor(ctx, x, y, x * TILE, y * TILE);
-
-      if (map[y][x] === "#") {
-        drawSprite(ctx, fibreSprite, x * TILE, y * TILE);
-      } else if (map[y][x] === "c") {
-        drawSprite(ctx, crumbSprite, x * TILE, y * TILE);
-      }
-    }
-  }
-
-  const playerSprite = characters[save.character].sprite;
-  drawSprite(ctx, playerSprite, playerX * TILE, playerY * TILE);
-
-  // Draw every dust bunny
-  for (const bunny of bunnies) {
-    drawSprite(ctx, bunnySprite, bunny.x * TILE, bunny.y * TILE);
-  }
-
-  // And every Moul
-  for (const moul of mouls) {
-    drawSprite(ctx, moulSprite, moul.x * TILE, moul.y * TILE);
-  }
+  view.sync({
+    map: map,
+    playerX: playerX,
+    playerY: playerY,
+    playerSprite: characters[save.character].sprite,
+    bunnies: bunnies,
+    mouls: mouls,
+  });
 }
 
 function updateText() {
@@ -176,6 +160,7 @@ function getCaught(enemy) {
   waiting = true;
   message.textContent = "Oh no! A " + enemy + " got you!";
   playPoof();
+  view.poof(playerX, playerY);
   // Wait 1.5 seconds, then start the level again
   setTimeout(function () {
     loadLevel(levelNumber);

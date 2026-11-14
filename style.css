@@ -138,7 +138,7 @@ canvas {
 .hud {
   display: flex;
   justify-content: space-between;
-  max-width: 480px;
+  max-width: 800px;
   margin: 0 auto 12px;
   font-size: 12px;
   color: #fff200;
@@ -243,4 +243,15 @@ h2 {
   margin-top: 6px;
   font-size: 7px;
   color: #fff200;
+}
+
+/* The 3D game screen: big, and keeps a 3:2 shape on any screen size */
+#game {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 3 / 2;
+  margin: 0 auto;
+  border-radius: 12px;
+  image-rendering: auto;
 }

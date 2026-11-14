@@ -4,12 +4,13 @@
 
 // ----- Setup -----
 
+// The 3D view draws the game onto this canvas (see render3d.js)
 const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const view = createView(canvas, { follow: true });
 const minimap = document.getElementById("minimap");
 const miniCtx = minimap.getContext("2d");
 
-// The screen shows 15 x 11 tiles of the world at a time
+// Roughly how many tiles the camera shows at once (for the box on the mini-map)
 const VIEW_WIDTH = 15;
 const VIEW_HEIGHT = 11;
 
@@ -243,56 +244,21 @@ function exploredPercent() {
 // ----- Drawing -----
 
 function draw() {
-  // The camera tries to keep the player in the middle of the screen,
-  // but stops at the edges of the world
+  view.sync({
+    map: map,
+    playerX: playerX,
+    playerY: playerY,
+    playerSprite: player().sprite,
+    bunnies: bunnies,
+    mouls: mouls,
+    explored: explored,
+  });
+
+  // The mini-map shows a box around roughly what's on the big screen
   const worldWidth = map[0].length;
   const worldHeight = map.length;
   const cameraX = Math.max(0, Math.min(playerX - 7, worldWidth - VIEW_WIDTH));
   const cameraY = Math.max(0, Math.min(playerY - 5, worldHeight - VIEW_HEIGHT));
-
-  for (let viewY = 0; viewY < VIEW_HEIGHT; viewY++) {
-    for (let viewX = 0; viewX < VIEW_WIDTH; viewX++) {
-      const x = cameraX + viewX;
-      const y = cameraY + viewY;
-      const screenX = viewX * TILE;
-      const screenY = viewY * TILE;
-
-      // Haven't been here yet? It's dark!
-      if (!explored.has(x + "," + y)) {
-        ctx.fillStyle = "#0a0014";
-        ctx.fillRect(screenX, screenY, TILE, TILE);
-        continue; // skip to the next square
-      }
-
-      drawFloor(ctx, x, y, screenX, screenY);
-
-      if (map[y][x] === "#") {
-        drawSprite(ctx, fibreSprite, screenX, screenY);
-      } else if (map[y][x] === "c") {
-        drawSprite(ctx, crumbSprite, screenX, screenY);
-      } else if (map[y][x] === "B") {
-        drawSprite(ctx, buttonSprite, screenX, screenY);
-      }
-    }
-  }
-
-  const playerSprite = characters[save.character].sprite;
-  drawSprite(ctx, playerSprite, (playerX - cameraX) * TILE, (playerY - cameraY) * TILE);
-
-  // Only draw bunnies on squares you've explored
-  for (const bunny of bunnies) {
-    if (explored.has(bunny.x + "," + bunny.y)) {
-      drawSprite(ctx, bunnySprite, (bunny.x - cameraX) * TILE, (bunny.y - cameraY) * TILE);
-    }
-  }
-
-  // Mouls too
-  for (const moul of mouls) {
-    if (explored.has(moul.x + "," + moul.y)) {
-      drawSprite(ctx, moulSprite, (moul.x - cameraX) * TILE, (moul.y - cameraY) * TILE);
-    }
-  }
-
   drawMinimap(cameraX, cameraY);
 }
 
@@ -536,6 +502,7 @@ function checkTouch() {
 
   // Glurk's Mighty Spear bonks enemies away!
   if (player().strong) {
+    view.poof(enemy.x, enemy.y);
     sendHome(enemy);
     playBonk();
     if (mouls.includes(enemy)) {
@@ -552,6 +519,7 @@ function checkTouch() {
   // Snibril's Brave Heart saves him once per visit
   if (player().shield && !shieldUsed) {
     shieldUsed = true;
+    view.poof(enemy.x, enemy.y);
     sendHome(enemy);
     playBonk();
     message.textContent = "Snibril's Brave Heart saves him! (Only works once!)";
@@ -566,6 +534,7 @@ function getCaught() {
   waiting = true;
   message.textContent = "You got caught! Back to the start...";
   playPoof();
+  view.poof(playerX, playerY);
   setTimeout(function () {
     playerX = startX;
     playerY = startY;
