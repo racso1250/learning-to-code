@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pinecrest</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>⛰️ Pinecrest ⛰️</h1>
+
+    <div class="hud">
+      <span id="money"></span>
+      <span id="place"></span>
+      <span id="bag-space"></span>
+    </div>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <div id="dialogue" hidden>
+        <p id="dialogue-name"></p>
+        <p id="dialogue-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="shop" class="overlay" hidden></div>
+
+      <div id="big-news" class="overlay" hidden>
+        <p id="big-news-text"></p>
+        <button id="close-news">OK!</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2>Pinecrest</h2>
+        <p>You live in Pinecrest, a little village high in the mountains.</p>
+        <p>You don't have a home. You sleep by a campfire at the edge of the village.</p>
+        <p>But the mountains are full of treasure! Dig it up, sell it to Mabel at the shop, and save up for the old cottage.</p>
+        <p>Your friend Tom is waiting for you in the village...</p>
+        <button id="start">Start</button>
+      </div>
+    </div>
+
+    <p class="help">Arrow keys or WASD to walk. Walk into rocks to mine them. Space to talk.</p>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Tom's map</h2>
+        <canvas id="minimap" width="192" height="192"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Backpack</h2>
+        <div id="bag-list"></div>
+      </div>
+      <div class="panel">
+        <h2>Goals</h2>
+        <ul id="goal-list"></ul>
+        <button id="new-game" class="small">Start a new game</button>
+      </div>
+    </div>
+
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="sprites.js"></script>
+    <script src="world.js"></script>
+    <script src="render.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
