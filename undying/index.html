@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>The Undying Lands</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="undying.css">
+  </head>
+  <body>
+    <h1>The Undying Lands</h1>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <div id="dialogue" hidden>
+        <p id="dialogue-name"></p>
+        <p id="dialogue-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="the-end" hidden>
+        <h2>The End</h2>
+        <p>Frodo and Sam are together again in the Undying Lands.</p>
+        <p>Thanks for playing! You can keep exploring the island.</p>
+        <button id="close-the-end">Keep exploring</button>
+      </div>
+    </div>
+
+    <p class="help">Arrow keys or WASD to walk. Space to talk.</p>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Map</h2>
+        <canvas id="minimap" width="192" height="144"></canvas>
+        <p id="region"></p>
+      </div>
+      <div class="panel">
+        <h2>Quests</h2>
+        <ul id="quests"></ul>
+      </div>
+      <div class="panel">
+        <h2>Bag</h2>
+        <p id="bag"></p>
+        <button id="new-game">Start a new game</button>
+      </div>
+    </div>
+
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="sprites.js"></script>
+    <script src="world.js"></script>
+    <script src="story.js"></script>
+    <script src="render.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
