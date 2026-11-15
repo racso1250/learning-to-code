@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dragon Tamers 2: The Frozen Crown</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="../dragon/style.css?v=3">
+  </head>
+  <body>
+    <h1>Dragon Tamers 2: The Frozen Crown</h1>
+
+    <div class="hud">
+      <canvas id="hearts" width="55" height="10"></canvas>
+      <span id="berries"></span>
+      <span id="dragon-label"></span>
+      <span id="party">
+        <button class="slot" id="slot-human" title="Play as yourself (press 1)"><canvas width="16" height="16"></canvas><b>1</b></button>
+        <button class="slot" id="slot-dragon" title="Play as your dragon (press 2)" hidden><canvas width="16" height="16"></canvas><b>2</b></button>
+        <button class="slot" id="slot-wizard" title="Play as Gandalf (press 3)" hidden><canvas width="16" height="16"></canvas><b>3</b></button>
+      </span>
+      <button id="pause-button">⏸ Pause</button>
+    </div>
+    <p id="place">A 16-bit adventure</p>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div class="tilt top"></div>
+      <div class="tilt bottom"></div>
+      <div class="vignette"></div>
+      <div id="hurt"></div>
+
+      <div id="boss-bar" hidden><span>The Shadow Wyrm</span><div class="bar"><div id="boss-fill"></div></div></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <!-- The talking box, with a picture of who is speaking -->
+      <div id="dialogue" hidden>
+        <canvas id="dialogue-face" width="16" height="16"></canvas>
+        <div>
+          <p id="dialogue-name"></p>
+          <p id="dialogue-text"></p>
+        </div>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <!-- Taming: copy the dragon's song -->
+      <div id="tame" class="overlay" hidden>
+        <h2>The dragon's song</h2>
+        <p id="tame-text"></p>
+        <div class="pads">
+          <div class="pad" data-note="0">▲</div>
+          <div class="pad" data-note="1">◀</div>
+          <div class="pad" data-note="2">▶</div>
+          <div class="pad" data-note="3">▼</div>
+        </div>
+        <p id="tame-trust"></p>
+      </div>
+
+      <div id="name-box" class="overlay" hidden>
+        <h2>Your dragon needs a name!</h2>
+        <input id="name-input" type="text" maxlength="10" value="Ember" autocomplete="off">
+        <button id="name-ok">That's the one!</button>
+      </div>
+
+      <!-- Story cards: big moments in the story -->
+      <div id="card" class="overlay" hidden>
+        <canvas id="card-art" width="120" height="48" hidden></canvas>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="map" class="overlay" hidden>
+        <canvas id="map-canvas" width="10" height="10"></canvas>
+        <p class="keys">You are the flashing dot. Squares: beacons (gold when lit). Small dots: gems. Red: closed gates and bosses. M: close the map.</p>
+      </div>
+
+      <div id="paused" class="overlay" hidden>
+        <h2>Paused</h2>
+        <p>Press P to keep playing.</p>
+      </div>
+
+      <div id="intro" class="overlay">
+        <p class="small-title">Dragon Tamers 2</p>
+        <h2 class="logo">The Frozen Crown</h2>
+        <p id="intro-text">A winter that will not end is creeping down from the north. You are the new Dragon Tamer: raise your hatchling, cross nine lands and take back the Sun Crown from the Ice Wyrm.</p>
+        <p class="keys">Arrows / WASD: move &nbsp; Space: talk, use, attack &nbsp; C (or 1, 2, 3): swap between you, your dragon and Gandalf &nbsp; M: map &nbsp; P: pause</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+        <button id="free-play" class="small">Free Play: the Middle Lands</button>
+      </div>
+    </div>
+
+    <p class="help">You travel with Gandalf the wizard and Biscuit the border terrier. When Biscuit barks, something is buried nearby!</p>
+    <p><button id="new-game" class="small">Start again from the beginning</button></p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <script src="../sounds.js"></script>
+    <script src="../dragon/mapkit.js?v=3"></script>
+    <script src="story.js?v=3"></script>
+    <script src="../dragon/pixels.js?v=3"></script>
+    <script src="../dragon/ground.js?v=3"></script>
+    <script src="../dragon/game.js?v=3"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
