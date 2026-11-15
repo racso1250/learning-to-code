@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spark Knights</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>✨ Spark Knights ✨</h1>
+
+    <div class="hud">
+      <span id="hearts"></span>
+      <span class="level-box"><span id="level"></span><span class="xp-bar"><span id="xp-fill"></span></span></span>
+      <span id="spark"></span>
+      <span id="weapon"></span>
+      <button id="home-button" hidden>🏠 Go home</button>
+    </div>
+    <p id="place"></p>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div class="tilt top"></div>
+      <div class="tilt bottom"></div>
+      <div class="vignette"></div>
+      <div id="hurt"></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <div id="dialogue" hidden>
+        <p id="dialogue-name"></p>
+        <p id="dialogue-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="menu" class="overlay" hidden></div>
+
+      <div id="big-news" class="overlay" hidden>
+        <p id="big-news-text"></p>
+        <button id="close-news">OK!</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2>Spark Knights</h2>
+        <p>You are a little spark, a brave Spark Knight from the village of Sparkhaven.</p>
+        <p>Strange tears have opened up in the world, leading to 24 worlds full of monsters and treasure.</p>
+        <p>Talk to the Elder Spark in the village square to begin your adventure!</p>
+        <p class="keys">Arrows / WASD: walk and fight &nbsp; Space: talk and use &nbsp; H: go home</p>
+        <button id="start">Start</button>
+      </div>
+    </div>
+
+    <p class="help">Walk into monsters to fight. Your sparklings zap monsters near you. Level up to uncover more of Sparkhaven!</p>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Map</h2>
+        <canvas id="minimap" width="216" height="216"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Sparkhaven</h2>
+        <ul id="zone-list"></ul>
+        <p id="stats"></p>
+      </div>
+      <div class="panel">
+        <h2>Weapons</h2>
+        <ul id="weapon-list"></ul>
+        <button id="new-game" class="small">Start again</button>
+      </div>
+    </div>
+
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="../temple/sprites.js"></script>
+    <script src="sprites.js"></script>
+    <script src="world.js"></script>
+    <script src="render.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
