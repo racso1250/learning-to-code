@@ -1,0 +1,280 @@
+/* Cubewild: bright sky blues and grassy greens */
+
+body {
+  background: linear-gradient(#16324a, #0c1a26);
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px 16px;
+  color: #eef8ff;
+  font-family: "Press Start 2P", monospace;
+  text-align: center;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0 0 16px;
+  color: #8fe05a;
+  text-shadow: 3px 3px 0 #2f6a2a, 0 0 14px rgba(140, 224, 90, 0.5);
+}
+
+h2 {
+  font-size: 12px;
+  color: #ffe14a;
+  margin: 0 0 10px;
+}
+
+a {
+  color: #9fd8ff;
+  font-size: 10px;
+}
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  max-width: 960px;
+  margin: 0 auto 8px;
+  font-size: 10px;
+  color: #ffe14a;
+}
+
+#hearts {
+  color: #ff4a5a;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+button {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 10px 16px;
+  border: 2px solid #ffe14a;
+  border-radius: 8px;
+  background: #3f9a4a;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+button:hover {
+  box-shadow: 0 0 12px rgba(255, 225, 74, 0.7);
+}
+
+button.small,
+#mode-button {
+  font-size: 9px;
+  padding: 6px 10px;
+  background: rgba(10, 20, 30, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ----- The game screen ----- */
+
+.screen {
+  position: relative;
+  max-width: 960px;
+  margin: 0 auto;
+  border: 4px solid #2f5a7a;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000000;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  color: #ffffff;
+  text-shadow: 0 0 3px #000000;
+  pointer-events: none;
+}
+
+#hurt {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(255, 30, 40, 0.7) 100%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+#toast {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(10, 20, 30, 0.85);
+  border: 2px solid #ffe14a;
+  color: #ffe14a;
+  font-size: 10px;
+  line-height: 1.6;
+  max-width: 80%;
+  pointer-events: none;
+}
+
+/* The belt: the 9 things you can use straight away */
+#hotbar {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.slot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(10, 20, 30, 0.6);
+}
+
+.slot.picked {
+  border-color: #ffe14a;
+  box-shadow: 0 0 10px #ffe14a;
+}
+
+.slot img,
+.item img,
+.recipe img {
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
+}
+
+.slot img {
+  margin: 3px;
+}
+
+.slot b,
+.item b {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  font-size: 8px;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #000000;
+}
+
+#held {
+  position: absolute;
+  left: 50%;
+  bottom: 62px;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 9px;
+  text-shadow: 1px 1px 0 #000000;
+  pointer-events: none;
+}
+
+/* Big boxes that cover the screen: the title and the backpack */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px 6%;
+  background: rgba(8, 16, 26, 0.82);
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay p {
+  margin: 0;
+}
+
+.logo {
+  font-size: clamp(26px, 6vw, 52px);
+  color: #8fe05a;
+  text-shadow: 4px 4px 0 #2f6a2a, 0 0 20px rgba(140, 224, 90, 0.6);
+}
+
+.keys,
+.small {
+  font-size: 8px;
+  color: #bfe8ff;
+  line-height: 2;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  max-height: 84%;
+}
+
+.columns > div {
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+}
+
+.item {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 3px;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(10, 20, 30, 0.6);
+}
+
+.recipe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 4px 8px;
+  font-size: 8px;
+  text-align: left;
+  background: rgba(10, 20, 30, 0.6);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.recipe img {
+  width: 22px;
+  height: 22px;
+}
+
+.help {
+  max-width: 960px;
+  margin: 12px auto;
+  font-size: 9px;
+  line-height: 1.8;
+  color: #a8c8dc;
+}

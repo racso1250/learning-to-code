@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cubewild</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=2">
+  </head>
+  <body>
+    <h1>Cubewild</h1>
+
+    <div class="hud">
+      <span id="hearts"></span>
+      <span id="where"></span>
+      <span id="clock"></span>
+      <span id="tool"></span>
+      <button id="mode-button">Mode: Explorer</button>
+    </div>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="crosshair">+</div>
+      <div id="hurt"></div>
+      <p id="toast" hidden></p>
+      <div id="hotbar"></div>
+      <p id="held"></p>
+
+      <!-- The backpack: everything you have, and everything you can make -->
+      <div id="bag" class="overlay" hidden>
+        <div class="columns">
+          <div>
+            <h2>Your backpack</h2>
+            <p class="small">Click something to put it in the box you have picked on your belt.</p>
+            <div id="items" class="grid"></div>
+          </div>
+          <div>
+            <h2>Make things</h2>
+            <div id="recipes"></div>
+          </div>
+        </div>
+        <p class="small">Press E to close.</p>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Cubewild</h2>
+        <p>A whole world made of blocks, and it goes on forever. Dig, build, craft and explore. Make friends with the animals, and light lanterns before the Glooms come out at night!</p>
+        <p class="keys">Mouse: look &nbsp; WASD: move &nbsp; Space: jump &nbsp; Shift: run<br>Left click: dig &nbsp; Right click: build, use, pet &nbsp; 1 to 9 or wheel: pick a block<br>E: backpack and crafting &nbsp; Esc: stop<br>Creative mode only: tap Space twice (or G) to fly &nbsp; T: change the time of day</p>
+        <button id="start">Play Explorer mode</button>
+        <button id="start-creative">Play Creative mode</button>
+        <p class="small">Explorer: dig for your blocks and watch your hearts. Creative: every block is free, nothing hurts you, and you can fly.</p>
+      </div>
+    </div>
+
+    <p class="help">Explorer mode: collect blocks by digging, and watch your hearts. Creative mode: every block for free, no danger, and you can fly. You can swap any time with the Mode button.</p>
+    <p><button id="new-world" class="small">Make a brand new world</button></p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="world.js?v=2"></script>
+    <script src="game.js?v=2"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
