@@ -1,23 +1,151 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>My Game Arcade</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
-    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="home.css">
   </head>
   <body>
-    <h1>Welcome to My Game Arcade!</h1>
-    <p>Pick a game to play:</p>
+    <!-- Soft glowing blobs that drift slowly behind everything -->
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+    <div class="glow glow-3"></div>
 
-    <ul>
-      <li><a href="guess.html">Guess the Number</a></li>
-      <li><a href="rps.html">Rock, Paper, Scissors</a></li>
-      <li><a href="carpet.html">Carpet People</a></li>
-      <li><a href="undying/index.html">The Undying Lands</a></li>
-      <li><a href="diamonds/index.html">Diamond Isles</a></li>
-      <li><a href="mountain/index.html">Pinecrest</a></li>
-      <li><a href="temple/index.html">Temple Guardian</a></li>
-    </ul>
+    <header class="nav">
+      <a class="logo" href="index.html">
+        <span class="logo-icon">🎮</span>
+        <span>My Game Arcade</span>
+      </a>
+      <span class="game-count">7 games</span>
+    </header>
+
+    <main>
+      <!-- The big featured game at the top -->
+      <section class="hero">
+        <div class="hero-text">
+          <p class="eyebrow">Made while learning to code</p>
+          <h1>Welcome to my <span class="gradient">game arcade</span></h1>
+          <p class="lead">
+            Seven games I built from scratch: from a number guessing game
+            all the way to giant 3D worlds with temples, wizards and kingdoms to build.
+          </p>
+          <div class="hero-buttons">
+            <a class="button primary" href="temple/index.html">▶ Play Temple Guardian</a>
+            <a class="button secondary" href="#games">See all games</a>
+          </div>
+        </div>
+        <a class="hero-card" href="temple/index.html">
+          <img src="images/greatland-big.jpg" alt="A village in The Great Land, with houses, a windmill and villagers">
+          <span class="badge">NEW</span>
+          <div class="hero-card-label">
+            <strong>Temple Guardian</strong>
+            <span>Save the temples, then build your own kingdom</span>
+          </div>
+        </a>
+      </section>
+
+      <!-- All the games -->
+      <section id="games" class="games">
+        <div class="games-header">
+          <h2>All games</h2>
+          <div class="filters">
+            <button class="filter active" data-filter="all">All</button>
+            <button class="filter" data-filter="3d">3D worlds</button>
+            <button class="filter" data-filter="adventure">Adventure</button>
+            <button class="filter" data-filter="classic">Classic</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <a class="card" href="temple/index.html" data-tags="3d adventure">
+            <div class="thumb"><img src="images/temple.jpg" alt="Temple Guardian" loading="lazy"><span class="badge">NEW</span></div>
+            <div class="card-body">
+              <h3>Temple Guardian</h3>
+              <p>Save four temples from the Gloom. Gather, craft, fight and swim, then build a kingdom in Free Play.</p>
+              <div class="tags"><span>3D</span><span>Adventure</span><span>Crafting</span></div>
+            </div>
+          </a>
+
+          <a class="card" href="mountain/index.html" data-tags="3d adventure">
+            <div class="thumb"><img src="images/pinecrest.jpg" alt="Pinecrest" loading="lazy"></div>
+            <div class="card-body">
+              <h3>Pinecrest</h3>
+              <p>Mine endless mountains, sell your treasure and go from a campfire to a castle. There's a secret temple too!</p>
+              <div class="tags"><span>3D</span><span>Endless</span><span>Mining</span></div>
+            </div>
+          </a>
+
+          <a class="card" href="diamonds/index.html" data-tags="3d adventure">
+            <div class="thumb"><img src="images/diamonds.jpg" alt="Diamond Isles" loading="lazy"></div>
+            <div class="card-body">
+              <h3>Diamond Isles</h3>
+              <p>Climb cliffs, collect every diamond and travel through portals to four different islands.</p>
+              <div class="tags"><span>3D</span><span>Exploring</span><span>Islands</span></div>
+            </div>
+          </a>
+
+          <a class="card" href="undying/index.html" data-tags="3d adventure">
+            <div class="thumb"><img src="images/undying.jpg" alt="The Undying Lands" loading="lazy"></div>
+            <div class="card-body">
+              <h3>The Undying Lands</h3>
+              <p>A 16-bit adventure with quests, friends to help and a whole island to explore.</p>
+              <div class="tags"><span>3D</span><span>Adventure</span><span>Story</span></div>
+            </div>
+          </a>
+
+          <a class="card" href="carpet.html" data-tags="3d">
+            <div class="thumb"><img src="images/carpet.jpg" alt="Carpet People" loading="lazy"></div>
+            <div class="card-body">
+              <h3>Carpet People</h3>
+              <p>Collect crumbs and dodge dust bunnies and Mouls across 10 levels, then explore Free Play.</p>
+              <div class="tags"><span>3D</span><span>Levels</span><span>Characters</span></div>
+            </div>
+          </a>
+
+          <a class="card" href="rps.html" data-tags="classic">
+            <div class="thumb"><img src="images/rps.jpg" alt="Rock, Paper, Scissors" loading="lazy"></div>
+            <div class="card-body">
+              <h3>Rock, Paper, Scissors</h3>
+              <p>The classic game against the computer. Can you beat it?</p>
+              <div class="tags"><span>Classic</span><span>Quick</span></div>
+            </div>
+          </a>
+
+          <a class="card" href="guess.html" data-tags="classic">
+            <div class="thumb"><img src="images/guess.jpg" alt="Guess the Number" loading="lazy"></div>
+            <div class="card-body">
+              <h3>Guess the Number</h3>
+              <p>Find the secret number between 1 and 100 in as few guesses as you can.</p>
+              <div class="tags"><span>Classic</span><span>Puzzle</span></div>
+            </div>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>Built with HTML, CSS and JavaScript · 3D games use Three.js and need the internet</p>
+    </footer>
+
+    <script>
+      // The filter buttons: show only the games with that tag
+      const filters = document.querySelectorAll(".filter");
+      const cards = document.querySelectorAll(".card");
+
+      for (const button of filters) {
+        button.addEventListener("click", function () {
+          for (const other of filters) other.classList.remove("active");
+          button.classList.add("active");
+          const tag = button.dataset.filter;
+          for (const card of cards) {
+            const show = tag === "all" || card.dataset.tags.split(" ").includes(tag);
+            card.hidden = !show;
+          }
+        });
+      }
+    </script>
   </body>
 </html>
