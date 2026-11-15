@@ -59,7 +59,7 @@ Object.assign(areaColours, {
 //   spriteLight = how bright flat sprites are (a bit darker in gloomy worlds)
 Object.assign(areaMoods, {
   hub: { skyTop: "#3a4ac8", horizon: "#ffb88a", sparkle: 0xfff0a0, sparkleKind: "fireflies",
-    hemi: 0.5, sun: 0.8, sunColour: 0xffb070, light: 1.1, bloom: 0.75, bloomThreshold: 0.8, spriteLight: 0.92 },
+    hemi: 0.5, sun: 0.8, sunColour: 0xffb070, light: 0.7, bloom: 0.6, bloomThreshold: 0.88, spriteLight: 0.92 },
   bloom: { skyTop: "#2a9a8a", horizon: "#d8ffe8", sparkle: 0xffffff, sparkleKind: "butterflies",
     hemi: 0.7, sun: 0.8, light: 0.6, bloom: 0.4, bloomThreshold: 0.9 },
   tide: { skyTop: "#0a2a3a", horizon: "#2a5a6a", sparkle: 0x9fe8ff, sparkleKind: "pollen",
@@ -81,6 +81,15 @@ Object.assign(thingSprites, {
   tear: { sprite: riftSprite, size: 2.2, spins: true, noShadow: true, glow: "rgba(120, 200, 255, 0.4)",
     swaps: { m: "#1a3a6a", M: "#4a8ad8", v: "#9fe8ff", x: "#ffffff" } },
   crater: { sprite: craterSprite, size: 1.6, noShadow: true, glow: "rgba(255, 180, 60, 1)" },
+  // The secret hole looks like a little crack in the rock... easy to miss!
+  crack: { sprite: crackSprite, size: 0.9, noShadow: true },
+  rope: { sprite: ropeSprite, size: 1.4, noShadow: true, glow: "rgba(255, 240, 200, 0.45)" },
+  tablet: { sprite: totemSprite, size: 1.2, swaps: { c: "#9a96a4", C: "#6e6b78", e: "#c8c4d0", y: "#c8a050" } },
+  brazier: { sprite: craterSprite, size: 0.9, noShadow: true, glow: "rgba(255, 160, 60, 1)" },
+  portal: { sprite: riftSprite, size: 3, noShadow: true, swaps: { m: "#2a2630", M: "#4a4450", v: "#6a6470", x: "#8a8490" } },
+  portalOpen: { sprite: riftSprite, size: 3, noShadow: true, spins: true, glow: "rgba(255, 220, 120, 0.8)",
+    swaps: { m: "#8a4a10", M: "#e0902a", v: "#ffd84a", x: "#ffffff" } },
+  banner: { sprite: bannerSprite, size: 1.6 },
 });
 
 // Make a colour darker: darker("#80c060", 0.7) is 70% as bright
@@ -91,6 +100,27 @@ function darker(hex, amount) {
   const b = Math.round((n & 255) * amount);
   return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
 }
+
+// The secret temple (dark and ancient) and the battlefield 3000 years ago (golden and dusty)
+Object.assign(areaColours, {
+  secret: {
+    sky: 0x000000,
+    grass: ["#5a4a3a", "#4a3a2c", "#6a5a48"], rock: ["#3a3238", "#2c2630", "#4a4048"],
+    snow: ["#f4f8fc", "#dfe8f2", "#ffffff"], water: ["#1a2a4a", "#2a3a5a", "#6a8ad0"],
+    floor: ["#7a6a50", "#5e5040", "#8a7a5e"], floorSide: ["#5e5040", "#4a3e30", "#6e6048"],
+  },
+  past: {
+    sky: 0xffd8a0,
+    grass: ["#9ab048", "#86a03c", "#aec45a"], rock: ["#a89068", "#907a58", "#bca478"],
+    snow: ["#f4f8fc", "#dfe8f2", "#ffffff"], water: ["#3a7ab0", "#4a8ac0", "#c0e0ff"],
+  },
+});
+Object.assign(areaMoods, {
+  secret: { skyTop: "#000000", horizon: "#0a0806", sparkle: 0xffc880, sparkleKind: "embers",
+    hemi: 0.2, sun: 0.12, light: 2.6, bloom: 0.9, bloomThreshold: 0.55, spriteLight: 0.8 },
+  past: { skyTop: "#b85a2a", horizon: "#ffd8a0", sparkle: 0xffb070, sparkleKind: "embers",
+    hemi: 0.6, sun: 0.85, sunColour: 0xffa860, light: 1, bloom: 0.7, bloomThreshold: 0.8 },
+});
 
 // The little cliff edges between steps used to be brown dirt, which looked like brown lines
 // across the grass. Now they're just a darker shade of the ground on top.
@@ -118,6 +148,8 @@ function loadSave() {
     hubY: HUB_START.y,
     hubTaken: {},      // spark crystals you've picked up at home (they grow back)
     metElder: false,
+    foundTemple: false,   // have you fallen into the secret hole yet?
+    battleWon: false,     // did you win the Battle of the Spark?
   };
   try {
     const text = localStorage.getItem(SAVE_NAME);
@@ -129,7 +161,8 @@ function loadSave() {
 }
 
 function saveGame() {
-  if (mode === "hub") {
+  // Remember where you are at home (but not while you're falling down the secret hole!)
+  if (mode === "hub" && tiles.length === HUB_SIZE && tiles[playerY][playerX].thing !== "crack") {
     save.hubX = playerX;
     save.hubY = playerY;
   }
@@ -144,7 +177,7 @@ const save = loadSave();
 
 // ----- Game state -----
 
-let mode = "hub";        // "hub" (at home) or "world" (through the tear)
+let mode = "hub";        // "hub" (at home), "world" (through the tear), "secret" (the temple) or "past"
 let worldIndex = 0;
 let tiles = [];
 let playerX = save.hubX;
@@ -207,6 +240,41 @@ function closeBigNews() {
   }
 }
 
+// ----- Cut scenes: the screen goes dark and the story appears line by line -----
+
+const cutsceneBox = document.getElementById("cutscene");
+const cutsceneText = document.getElementById("cutscene-text");
+let cutscene = null; // { lines, number, done, timer }
+
+function playCutscene(lines, done) {
+  cutscene = { lines: lines, number: -1, done: done, timer: null };
+  cutsceneBox.hidden = false;
+  cutsceneBox.className = "showing";
+  nextCutsceneLine();
+}
+
+// Show the next line (automatically after a moment, or straight away if you press Space)
+function nextCutsceneLine() {
+  clearTimeout(cutscene.timer);
+  cutscene.number++;
+  if (cutscene.number >= cutscene.lines.length) {
+    const done = cutscene.done;
+    cutscene = null;
+    cutsceneBox.className = "";
+    cutsceneBox.hidden = true;
+    if (done) done();
+    return;
+  }
+  const line = cutscene.lines[cutscene.number];
+  cutsceneText.textContent = line;
+  cutsceneText.className = line === line.toUpperCase() && line.length > 6 ? "big" : ""; // shouting lines are big
+  cutsceneText.style.animation = "none";
+  void cutsceneText.offsetWidth; // restart the fade-in
+  cutsceneText.style.animation = "";
+  playTone(0, 0.2, 300 + cutscene.number * 60, 500 + cutscene.number * 60, 0.04);
+  cutscene.timer = setTimeout(nextCutsceneLine, 2600);
+}
+
 // ----- Sounds (from the arcade's sounds.js) -----
 
 function playStep() { playTone(0, 0.03, 220, 160, 0.03); }
@@ -229,6 +297,65 @@ function updateMist() {
     }
   }
   view.setMist(squares);
+}
+
+// ----- The spark people of Sparkhaven -----
+// They wander around near their homes. Walk up to one and press Space to chat!
+
+const townsfolk = [
+  { id: "pip", name: "Pip", sprite: sparkKid, homeX: 31, homeY: 40, lines: [
+    "Wow, a real Spark Knight! When I grow up, I want a sword AND a shield!",
+    "I tried to jump into the tear once. Mum said I'm too little. Hmph!",
+    "Have you got lots of sparklings? I've only got... zero. But one day!",
+  ] },
+  { id: "bun", name: "Baker Bun", sprite: sparkBaker, homeX: 40, homeY: 48, lines: [
+    "Fresh spark-buns! Toasty warm, straight from my own flame.",
+    "A knight needs a good breakfast before visiting other worlds!",
+    "My secret ingredient? A pinch of starlight from the Star Void.",
+  ] },
+  { id: "ember", name: "Farmer Ember", sprite: sparkFarmer, homeX: 51, homeY: 44, lines: [
+    "The Glow Meadow grows the brightest flowers in all of Sparkhaven.",
+    "Ever since you cleared those worlds, my crops have been glowing extra bright!",
+    "Mind the herbs, little knight. They tickle.",
+  ] },
+  { id: "gran", name: "Granny Glow", sprite: sparkGranny, homeX: 33, homeY: 47, lines: [
+    "When I was a young spark, Mount Spark was as tall as the sky...",
+    "My grandmother told me stories about the great Battle of the Spark. Long, long ago.",
+    "You remind me of a knight in those old stories, dear. Isn't that funny?",
+  ] },
+  { id: "lumen", name: "Lumen the Lamplighter", sprite: sparkLamplighter, homeX: 43, homeY: 43, lines: [
+    "I light every lamp in Sparkhaven, every single evening.",
+    "See that glow in the north? That's Mount Spark's crater. It never goes out.",
+    "Some say there's a hidden crack on Mount Spark's slope... but I've never found it.",
+  ] },
+];
+for (const folk of townsfolk) {
+  folk.x = folk.homeX;
+  folk.y = folk.homeY;
+  folk.chats = 0;
+}
+
+function folkAt(x, y) {
+  return mode === "hub" ? townsfolk.find((f) => f.x === x && f.y === y) : null;
+}
+
+// Every so often, each spark person takes a little stroll near their home
+function townsfolkWander() {
+  if (mode !== "hub" || busy()) return;
+  for (const folk of townsfolk) {
+    if (Math.random() < 0.65) continue; // standing still, having a think
+    const [dx, dy] = [[1, 0], [-1, 0], [0, 1], [0, -1]][Math.floor(Math.random() * 4)];
+    const nx = folk.x + dx;
+    const ny = folk.y + dy;
+    const tile = tiles[ny] && tiles[ny][nx];
+    if (!tile || tile.kind === "water" || tile.thing || !zoneUnlocked(tile.zone)) continue;
+    if (Math.abs(nx - folk.homeX) > 3 || Math.abs(ny - folk.homeY) > 3) continue;
+    if ((nx === playerX && ny === playerY) || (nx === ELDER.x && ny === ELDER.y) || folkAt(nx, ny)) continue;
+    if (Math.abs(tile.height - tiles[folk.y][folk.x].height) > 1) continue;
+    folk.x = nx;
+    folk.y = ny;
+  }
+  draw();
 }
 
 // ----- Going home, and going through the tear -----
@@ -332,11 +459,12 @@ function canMonsterStand(x, y) {
   const tile = tiles[y] && tiles[y][x];
   if (!tile || tile.kind === "water" || BLOCKERS.includes(tile.thing) || tile.thing === "tearHeart") return false;
   if (x === playerX && y === playerY) return false;
+  if (mode === "past" && allies.some((a) => !a.out && a.x === x && a.y === y)) return false;
   return !enemyAt(x, y);
 }
 
 function busy() {
-  return !save.started || !bigNews.hidden || !menuBox.hidden || talking;
+  return !save.started || !bigNews.hidden || !menuBox.hidden || talking || cutscene !== null;
 }
 
 function move(dx, dy) {
@@ -357,7 +485,7 @@ function move(dx, dy) {
   } else if (mode === "hub" && there.zone && !zoneUnlocked(there.zone)) {
     const zone = zones.find((z) => z.id === there.zone);
     warn("The mist is too thick! Reach level " + zone.level + " to uncover " + zone.name + ".");
-  } else if (BLOCKERS.includes(there.thing) || (mode === "hub" && newX === ELDER.x && newY === ELDER.y)) {
+  } else if (BLOCKERS.includes(there.thing) || (mode === "hub" && newX === ELDER.x && newY === ELDER.y) || (mode === "past" && allyAt(newX, newY)) || folkAt(newX, newY)) {
     // something's in the way
   } else if (isLava(there)) {
     warn("That's lava! Even a spark can't swim in lava.");
@@ -395,7 +523,61 @@ function pickUp(tile) {
     tile.thing = null;
     view.removeThing(playerX, playerY, "#ffffff");
     clearWorld();
+  } else if (tile.thing === "crack") {
+    fallIntoHole();
+  } else if (tile.thing === "rope") {
+    climbOut();
   }
+}
+
+// ----- The secret hole and the secret temple -----
+
+function fallIntoHole() {
+  playNoise(0, 0.5, 3000, 200, 0.4);
+  const firstTime = !save.foundTemple;
+  save.foundTemple = true;
+  saveGame();
+  // When you come back, you'll be standing next to the crack (not on it)
+  save.hubX = SECRET_HOLE.x - 1;
+  save.hubY = SECRET_HOLE.y;
+  const lines = firstTime
+    ? [
+        "CRACK!",
+        "The ground gives way beneath your feet...",
+        "You tumble down, down, down into the dark...",
+        "THUMP!",
+        "Slowly, you open your eyes.",
+        "All around you, ancient braziers flicker to life...",
+        "You've found a SECRET TEMPLE, hidden deep inside Mount Spark!",
+      ]
+    : ["Down the secret hole you go...", "THUMP!"];
+  playCutscene(lines, enterSecretTemple);
+}
+
+function enterSecretTemple() {
+  mode = "secret";
+  tiles = makeSecretTemple();
+  // The portal only opens once you've cleared all 24 worlds
+  if (save.cleared.length >= worlds.length) tiles[SECRET_PORTAL.y][SECRET_PORTAL.x].thing = "portalOpen";
+  playerX = SECRET_START.x;
+  playerY = SECRET_START.y;
+  facing = "up";
+  enemies = [];
+  hearts = maxHearts(save.level);
+  view.load(tiles, "secret");
+  for (const p of secretPillars) view.setBuilding(p.x + "," + p.y, "pillar", p.x, p.y);
+  homeButton.hidden = false;
+  draw();
+  updatePanels();
+}
+
+// Climb the rope back up to Mount Spark (next to the hole)
+function climbOut() {
+  save.hubX = SECRET_HOLE.x - 1;
+  save.hubY = SECRET_HOLE.y;
+  mode = "hub";
+  goHome();
+  showToast("You climb back up the rope to Mount Spark.");
 }
 
 function attack(enemy, dx, dy) {
@@ -425,6 +607,10 @@ function defeat(enemy) {
     tile.thing = "heartPickup";
     view.addThing(enemy.x, enemy.y);
   }
+  if (enemy.boss) {
+    winBattle();
+    return;
+  }
   if (enemy.guardian) {
     guardianDefeated = true;
     playJingle();
@@ -447,6 +633,162 @@ function clearWorld() {
   if (save.cleared.length === worlds.length) text = "🏆 You cleared ALL 24 WORLDS! You are the greatest Spark Knight ever!";
   saveGame();
   showBigNews(text, goHome);
+}
+
+// ----- 3000 years ago: the Battle of the Spark -----
+
+let allies = [];        // ancient Spark Knights fighting with you
+let wave = 0;           // which wave of the Shadow Tyrant's army
+let battleStage = "";   // "talk", "wave", "boss" or "won"
+
+function travelBackInTime() {
+  playNoise(0, 2.5, 200, 4000, 0.4);
+  playCutscene([
+    "The twenty-four runes blaze with light!",
+    "The portal roars open, swirling with golden fire...",
+    "You step inside, and the whole world spins around you...",
+    "Years fly past... 100... 1000... 2000... 3000...",
+    "3000 YEARS AGO",
+    "THE BATTLE OF THE SPARK",
+  ], enterPast);
+}
+
+function enterPast() {
+  mode = "past";
+  tiles = makeBattlefield();
+  playerX = PAST_START.x;
+  playerY = PAST_START.y;
+  facing = "up";
+  enemies = [];
+  hearts = maxHearts(save.level);
+  wave = 0;
+  battleStage = "talk";
+  view.load(tiles, "past");
+  // Six ancient Spark Knights stand ready
+  allies = [];
+  for (let i = 0; i < 6; i++) {
+    const x = PAST_CAMP.x - 5 + i * 2;
+    allies.push({ id: "knight" + i, x: x, y: PAST_CAMP.y - 4, hp: 12, out: 0, lastMove: 0, homeX: x, homeY: PAST_CAMP.y - 4 });
+  }
+  homeButton.hidden = true; // no going home in the middle of a battle!
+  draw();
+  updatePanels();
+  say("Ancient Spark Knight", [
+    "A new knight! Where did you come from? ...The future?! Well, you came just in time!",
+    "The Shadow Tyrant's army is marching on Sparkhaven. Stand with us!",
+    "Beat back every wave, and then we'll face the Tyrant together!",
+  ], function () {
+    battleStage = "wave";
+    spawnWave();
+  });
+}
+
+// The Tyrant's army arrives from the north
+function spawnWave() {
+  const plan = battleWaves[wave];
+  const ember = { sprite: blobMonster, size: 1, swaps: { T: "#2a1414", t: "#5a2020", w: "#ff4a2a" } };
+  const brute = { sprite: batMonster, size: 1.6, swaps: { T: "#2a1030", t: "#5a2a68", w: "#ff4a2a" } };
+  for (let i = 0; i < plan.embers + plan.brutes; i++) {
+    const isBrute = i >= plan.embers;
+    for (let tries = 0; tries < 50; tries++) {
+      const x = 4 + Math.floor(Math.random() * (PAST_SIZE - 8));
+      const y = 3 + Math.floor(Math.random() * 8);
+      if (!canMonsterStand(x, y)) continue;
+      enemies.push({
+        id: nextEnemyId++, kind: "gloomling", look: isBrute ? brute : ember, x: x, y: y,
+        hp: isBrute ? 60 : 25, maxHp: isBrute ? 60 : 25, damage: isBrute ? 3 : 2,
+        speed: isBrute ? 800 : 600, xp: isBrute ? 40 : 15, lastMove: Date.now(),
+      });
+      break;
+    }
+  }
+  playNoise(0, 1, 150, 400, 0.4);
+  showToast("⚔️ Wave " + (wave + 1) + " of " + battleWaves.length + "! Here they come!");
+}
+
+function spawnTyrant() {
+  battleStage = "boss";
+  enemies.push({
+    id: nextEnemyId++, kind: "king", boss: true,
+    look: { sprite: gloomKingSprite, size: 3, swaps: { m: "#1a0a14", M: "#4a1a30", x: "#ff3a1a", y: "#8a1a1a" } },
+    x: 22, y: 8, hp: 500, maxHp: 500, damage: 3, speed: 900, xp: 500, lastMove: Date.now(),
+  });
+  playNoise(0, 2, 100, 300, 0.6);
+  showBigNews("The ground shakes... THE SHADOW TYRANT has come! Defeat him, with the help of the ancient knights!");
+}
+
+function winBattle() {
+  battleStage = "won";
+  save.battleWon = true;
+  save.spark += 2000;
+  saveGame();
+  playJingle();
+  playCutscene([
+    "The Shadow Tyrant lets out a terrible howl...",
+    "...and bursts into a thousand harmless sparks!",
+    "The ancient knights cheer: \"The light of Mount Spark is safe!\"",
+    "\"Thank you, knight from the future. We will carve your story into stone.\"",
+    "So THAT'S who the old tablets were about...",
+    "The portal pulls you gently back home.",
+  ], function () {
+    goHome();
+    showBigNews("🏆 You won the BATTLE OF THE SPARK! +2000 ✦ spark. You are a legend, past and present!");
+  });
+}
+
+// Each ancient knight marches at the nearest enemy and strikes it
+function alliesTakeTurns(now) {
+  for (const a of allies) {
+    if (a.out) {
+      if (now > a.out) { a.out = 0; a.hp = 12; a.x = a.homeX; a.y = a.homeY; }
+      continue;
+    }
+    if (now - a.lastMove < 700) continue;
+    a.lastMove = now;
+    let target = null;
+    let best = Infinity;
+    for (const e of enemies) {
+      const d = Math.abs(e.x - a.x) + Math.abs(e.y - a.y);
+      if (d < best) { best = d; target = e; }
+    }
+    if (!target) continue;
+    if (best === 1 || (target.boss && best <= 2)) {
+      target.hp -= 3;
+      target.hurt = true;
+      view.slash(target.x, target.y, target.x < a.x ? "left" : "right", "#7fc8ff");
+      if (target.hp <= 0) defeat(target);
+      continue;
+    }
+    const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => canMonsterStand(a.x + dx, a.y + dy) && !allyAt(a.x + dx, a.y + dy));
+    steps.sort((s1, s2) => Math.abs(a.x + s1[0] - target.x) + Math.abs(a.y + s1[1] - target.y) - (Math.abs(a.x + s2[0] - target.x) + Math.abs(a.y + s2[1] - target.y)));
+    if (steps.length) { a.x += steps[0][0]; a.y += steps[0][1]; }
+  }
+}
+
+function allyAt(x, y) {
+  return allies.find((a) => !a.out && a.x === x && a.y === y);
+}
+
+// In the past, the Tyrant's army attacks whoever is closest: you or an ancient knight
+function pastMonsterTurn(enemy) {
+  let target = { x: playerX, y: playerY, isPlayer: true };
+  let best = Math.abs(enemy.x - playerX) + Math.abs(enemy.y - playerY);
+  for (const a of allies) {
+    if (a.out) continue;
+    const d = Math.abs(enemy.x - a.x) + Math.abs(enemy.y - a.y);
+    if (d < best) { best = d; target = a; }
+  }
+  if (best === 1 || (enemy.boss && best <= 2)) {
+    if (target.isPlayer) hurtPlayer(enemy.damage);
+    else {
+      target.hp -= enemy.damage;
+      if (target.hp <= 0) target.out = Date.now() + 10000; // knocked out, back soon
+    }
+    return;
+  }
+  const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => canMonsterStand(enemy.x + dx, enemy.y + dy) && !allyAt(enemy.x + dx, enemy.y + dy));
+  steps.sort((s1, s2) => Math.abs(enemy.x + s1[0] - target.x) + Math.abs(enemy.y + s1[1] - target.y) - (Math.abs(enemy.x + s2[0] - target.x) + Math.abs(enemy.y + s2[1] - target.y)));
+  if (steps.length) { enemy.x += steps[0][0]; enemy.y += steps[0][1]; }
 }
 
 // ----- Levels -----
@@ -519,7 +861,12 @@ function hurtPlayer(damage) {
   hurtFlash.className = "on";
   setTimeout(() => (hurtFlash.className = ""), 150);
   playTone(0, 0.15, 300, 120, 0.1);
-  if (hearts <= 0) {
+  if (hearts <= 0 && mode === "past") {
+    hearts = maxHearts(save.level);
+    playerX = PAST_CAMP.x;
+    playerY = PAST_CAMP.y - 1;
+    showBigNews("Your flame flickered... but the ancient knights carried you back to camp. Back into battle!");
+  } else if (hearts <= 0) {
     showBigNews("Your flame flickered out! You float back home to Sparkhaven to warm up. (You keep your spark and XP.)", goHome);
   }
 }
@@ -548,14 +895,32 @@ function monsterTurn(enemy) {
   enemy.y += dy;
 }
 
+let lastTyrantCall = 0;
+
 function tick() {
   if (busy()) return;
   const now = Date.now();
   updateSparklings(now);
+  if (mode === "past") {
+    alliesTakeTurns(now);
+    // When a wave is beaten, the next one comes (then the Tyrant himself!)
+    if (battleStage === "wave" && enemies.length === 0) {
+      wave++;
+      if (wave < battleWaves.length) spawnWave();
+      else spawnTyrant();
+    }
+    const tyrant = enemies.find((e) => e.boss);
+    if (tyrant && now - lastTyrantCall > 9000 && enemies.length < 8) {
+      lastTyrantCall = now;
+      enemies.push({ id: nextEnemyId++, kind: "gloomling", look: { sprite: blobMonster, size: 1, swaps: { T: "#2a1414", t: "#5a2020", w: "#ff4a2a" } },
+        x: tyrant.x + 2, y: tyrant.y + 1, hp: 25, maxHp: 25, damage: 2, speed: 600, xp: 15, lastMove: now });
+    }
+  }
   for (const enemy of enemies.slice()) {
     if (now - enemy.lastMove >= enemy.speed) {
       enemy.lastMove = now;
-      monsterTurn(enemy);
+      if (mode === "past") pastMonsterTurn(enemy);
+      else monsterTurn(enemy);
       if (!bigNews.hidden) break; // you fainted
     }
   }
@@ -566,25 +931,36 @@ function tick() {
 // ----- Talking, the tear and Mount Spark -----
 
 function nearbyThing() {
-  if (mode !== "hub") return null;
+  if (mode !== "hub" && mode !== "secret") return null;
   for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
     const x = playerX + dx;
     const y = playerY + dy;
-    if (x === ELDER.x && y === ELDER.y) return "elder";
+    if (mode === "hub" && x === ELDER.x && y === ELDER.y) return "elder";
+    const folk = folkAt(x, y);
+    if (folk) return "folk:" + folk.id;
     const tile = tiles[y] && tiles[y][x];
-    if (tile && tile.thing === "tear") return "tear";
-    if (tile && tile.thing === "crater") return "crater";
+    if (!tile) continue;
+    if (tile.thing === "tear") return "tear";
+    if (tile.thing === "crater") return "crater";
+    if (tile.thing === "tablet") return "tablet";
+    if (tile.thing === "portal" || tile.thing === "portalOpen") return "portal";
   }
   return null;
+}
+
+function tabletNear() {
+  return secretTablets.find((t) => Math.abs(t.x - playerX) + Math.abs(t.y - playerY) === 1);
 }
 
 let talking = false;
 let lines = [];
 let lineNumber = 0;
+let afterTalking = null;
 
-function say(name, said) {
+function say(name, said, after) {
   lines = said;
   lineNumber = 0;
+  afterTalking = after || null;
   talking = true;
   dialogueName.textContent = name;
   dialogueText.textContent = lines[0];
@@ -600,11 +976,20 @@ function nextLine() {
   } else {
     talking = false;
     dialogueBox.hidden = true;
+    if (afterTalking) {
+      const next = afterTalking;
+      afterTalking = null;
+      next();
+    }
     updatePanels();
   }
 }
 
 function elderHint() {
+  if (save.battleWon) return "The Battle of the Spark... you were THERE? The knight from the old stories was YOU? Incredible!";
+  if (save.cleared.length >= worlds.length && !save.foundTemple) {
+    return "Old stories say there's a hidden way into Mount Spark. Look carefully for a crack in the mountainside...";
+  }
   if (save.level < 6) return "Mount Spark is still hidden in the mist, far to the north. Reach level 6 to uncover it!";
   if (save.weapon < weapons.length - 1) {
     const next = weapons[save.weapon + 1];
@@ -615,6 +1000,15 @@ function elderHint() {
 
 function interact() {
   const thing = nearbyThing();
+  if (thing && thing.startsWith("folk:")) {
+    const folk = townsfolk.find((f) => "folk:" + f.id === thing);
+    const special = save.battleWon && folk.id === "gran"
+      ? "So it WAS you in Grandma's stories! The knight from the future! Oh my sparks!"
+      : null;
+    say(folk.name, [special || folk.lines[folk.chats % folk.lines.length]]);
+    folk.chats++;
+    return;
+  }
   if (thing === "elder") {
     if (!save.metElder) {
       save.metElder = true;
@@ -632,6 +1026,17 @@ function interact() {
     openWorldMenu();
   } else if (thing === "crater") {
     openMountSpark();
+  } else if (thing === "tablet") {
+    say("Ancient tablet", tabletNear().text);
+  } else if (thing === "portal") {
+    if (save.cleared.length >= worlds.length) {
+      travelBackInTime();
+    } else {
+      say("Ancient portal", [
+        "Twenty-four empty runes circle the old stone portal. " + save.cleared.length + " of them glow with spark-light.",
+        "Clear all 24 worlds through the tear to light every rune...",
+      ]);
+    }
   }
 }
 
@@ -737,6 +1142,13 @@ function updatePanels() {
   if (mode === "hub") {
     const zone = tiles[playerY] && tiles[playerY][playerX] ? zones.find((z) => z.id === tiles[playerY][playerX].zone) : null;
     placeText.textContent = "🏡 " + (zone ? zone.name : "Sparkhaven");
+  } else if (mode === "secret") {
+    placeText.textContent = "🏛️ The Secret Temple  · Runes lit: " + Math.min(save.cleared.length, worlds.length) + " / 24";
+  } else if (mode === "past") {
+    const tyrant = enemies.find((e) => e.boss);
+    placeText.textContent = tyrant
+      ? "⚔️ 3000 years ago · THE SHADOW TYRANT " + Math.max(0, tyrant.hp) + "/" + tyrant.maxHp
+      : "⚔️ 3000 years ago · Battle of the Spark · Wave " + Math.min(wave + 1, battleWaves.length) + "/" + battleWaves.length + " · Enemies: " + enemies.length;
   } else {
     const guardian = enemies.find((e) => e.guardian);
     placeText.textContent = "🌀 " + worlds[worldIndex].name + (guardian ? "  · Guardian " + Math.max(0, guardian.hp) + "/" + guardian.maxHp : "  · Grab the Tear Heart!");
@@ -768,8 +1180,11 @@ function updatePanels() {
   const thing = nearbyThing();
   promptBox.hidden = !thing || busy();
   if (thing === "elder") promptBox.textContent = "Space: Talk to the Elder Spark";
+  if (thing && thing.startsWith("folk:")) promptBox.textContent = "Space: Talk to " + townsfolk.find((f) => "folk:" + f.id === thing).name;
   if (thing === "tear") promptBox.textContent = "Space: Step into the tear";
   if (thing === "crater") promptBox.textContent = "Space: Drop spark into Mount Spark";
+  if (thing === "tablet") promptBox.textContent = "Space: Read the ancient tablet";
+  if (thing === "portal") promptBox.textContent = "Space: Look at the ancient portal";
 
   drawMap();
 }
@@ -808,7 +1223,15 @@ function drawMap() {
 function draw() {
   const people = sparklings.slice();
   if (mode === "hub") {
-    people.push({ id: "elder", x: ELDER.x, y: ELDER.y, sprite: elderSprite, glow: "rgba(150, 220, 255, 0.7)" });
+    people.push({ id: "elder", x: ELDER.x, y: ELDER.y, sprite: elderSprite, size: 1.25, glow: "rgba(150, 220, 255, 0.55)" });
+    for (const folk of townsfolk) {
+      people.push({ id: folk.id, x: folk.x, y: folk.y, sprite: folk.sprite, size: 0.85 });
+    }
+  }
+  if (mode === "past") {
+    for (const a of allies) {
+      if (!a.out) people.push({ id: a.id, x: a.x, y: a.y, sprite: ancientKnightSprite });
+    }
   }
   view.sync({
     x: playerX,
@@ -828,6 +1251,13 @@ function draw() {
 document.addEventListener("keydown", function (event) {
   const key = event.key;
   const isAction = key === " " || key === "Enter" || key === "e";
+  if (cutscene) {
+    if (isAction) {
+      nextCutsceneLine();
+      event.preventDefault();
+    }
+    return;
+  }
   if (!bigNews.hidden) {
     if (isAction) {
       closeBigNews();
@@ -851,14 +1281,14 @@ document.addEventListener("keydown", function (event) {
   else if (key === "ArrowLeft" || key === "a") move(-1, 0);
   else if (key === "ArrowRight" || key === "d") move(1, 0);
   else if (isAction) interact();
-  else if (key === "h" && mode === "world") goHome();
+  else if (key === "h" && (mode === "world" || mode === "secret")) goHome();
   else return;
   event.preventDefault();
 });
 
 homeButton.addEventListener("click", function () {
   this.blur();
-  if (mode === "world") goHome();
+  if (mode === "world" || mode === "secret") goHome();
 });
 document.getElementById("start").addEventListener("click", function () {
   this.blur();
@@ -887,3 +1317,4 @@ document.getElementById("new-game").addEventListener("click", function () {
 if (save.started) document.getElementById("intro").hidden = true;
 goHome();
 setInterval(tick, 200);
+setInterval(townsfolkWander, 1300);

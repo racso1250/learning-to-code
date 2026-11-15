@@ -360,3 +360,55 @@ li.current {
   color: #9fe8ff;
   white-space: pre-wrap;
 }
+
+/* Cut scenes: black screen, glowing words fading in */
+#cutscene {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: #000000;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+
+#cutscene[hidden] {
+  display: none;
+}
+
+#cutscene.showing {
+  opacity: 1;
+}
+
+#cutscene-text {
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 2;
+  color: #fff2c8;
+  text-shadow: 0 0 12px rgba(255, 200, 100, 0.8);
+  animation: fadeIn 0.9s ease;
+}
+
+#cutscene-text.big {
+  font-size: 22px;
+  color: #ffd84a;
+  letter-spacing: 2px;
+}
+
+#cutscene .skip {
+  position: absolute;
+  bottom: 14px;
+  right: 18px;
+  font-size: 8px;
+  color: #6a6480;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}

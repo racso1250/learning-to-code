@@ -37,6 +37,8 @@ const HUB_START = { x: 36, y: 45 };
 const TEAR = { x: 36, y: 39 };           // the Tear Gate: step in to visit other worlds
 const ELDER = { x: 33, y: 42 };          // the Elder Spark, who helps you
 const CRATER = { x: 36, y: 11 };         // the top of Mount Spark
+const MOUNT_HEIGHT = 16;                 // how many steps tall Mount Spark is
+const SECRET_HOLE = { x: 43, y: 15 };    // shh! A hidden crack on Mount Spark's slope
 
 const zones = [
   { id: "village", name: "Sparkhaven Village", level: 1 },
@@ -132,11 +134,14 @@ function makeHubTile(x, y) {
   }
 
   if (zone === "mount") {
-    // A big mountain, climbable step by step, with a glowing crater at the top
+    // A huge mountain, climbable step by step, with a glowing crater at the top.
+    // It drops about one step per square, so you can always climb it.
     const fromTop = Math.hypot(x - CRATER.x, y - CRATER.y);
-    tile.height = Math.max(1, Math.min(9, Math.round(9 - fromTop / 2.4 + (noise(x, y, 5, 2) - 0.5) * 0.8)));
-    tile.kind = tile.height >= 7 ? "snow" : "rock";
+    tile.height = Math.max(1, Math.min(MOUNT_HEIGHT, Math.round(MOUNT_HEIGHT - fromTop * 1.05 + (noise(x, y, 5, 2) - 0.5) * 0.4)));
+    tile.kind = tile.height >= 11 ? "snow" : "rock";
     if (x === CRATER.x && y === CRATER.y) tile.thing = "crater";
+    else if (x === SECRET_HOLE.x && y === SECRET_HOLE.y) tile.thing = "crack";
+    else if (Math.abs(x - SECRET_HOLE.x) + Math.abs(y - SECRET_HOLE.y) <= 1) tile.thing = null; // keep it reachable
     else if (fromTop > 2 && r < 0.05) tile.thing = "rock";
     else if (fromTop > 2 && r < 0.08) tile.thing = "pine";
     return tile;
@@ -261,7 +266,8 @@ function buildWorld(index, seed) {
 }
 
 // Things that block your way
-const BLOCKERS = ["tree", "pine", "deadTree", "rock", "crystal", "bush", "herb", "building", "tear", "crater", "elder"];
+const BLOCKERS = ["tree", "pine", "deadTree", "rock", "crystal", "bush", "herb", "building", "tear", "crater", "elder",
+  "tablet", "brazier", "portal", "banner"];
 
 // Can you walk from one place to another? (You can climb one step, and swim, but not in lava.)
 function canReach(tiles, from, to, theme) {
@@ -286,3 +292,92 @@ function canReach(tiles, from, to, theme) {
   }
   return false;
 }
+
+// ----- The secret temple, deep inside Mount Spark -----
+
+const SECRET_SIZE = 24;
+const SECRET_START = { x: 12, y: 18 };   // where you land after falling
+const SECRET_PORTAL = { x: 12, y: 3 };   // the ancient portal (it opens when all 24 worlds are cleared)
+const SECRET_EXIT = { x: 12, y: 20 };    // a rope back up to Mount Spark
+
+const secretPillars = [
+  { x: 9, y: 16 }, { x: 15, y: 16 }, { x: 9, y: 12 }, { x: 15, y: 12 }, { x: 9, y: 8 }, { x: 15, y: 8 },
+];
+const secretTablets = [
+  { x: 7, y: 14, text: [
+    "The old stone is carved with pictures of tiny sparks holding swords...",
+    "\"Three thousand years ago, the Shadow Tyrant came to steal the light of Mount Spark.\"",
+    "\"The Spark Knights stood together in the great Battle of the Spark.\"",
+  ] },
+  { x: 17, y: 14, text: [
+    "\"The battle was fierce. Many sparks flickered... but one small knight, from far in the future, came to help.\"",
+    "Wait... a knight from the future? Could that be... you?",
+  ] },
+  { x: 7, y: 6, text: [
+    "\"Seal the portal with the hearts of twenty-four worlds, and it will open the way to the past.\"",
+  ] },
+];
+
+function makeSecretTemple() {
+  const tiles = [];
+  for (let y = 0; y < SECRET_SIZE; y++) {
+    const row = [];
+    for (let x = 0; x < SECRET_SIZE; x++) {
+      const tile = { kind: "temple", height: 1, thing: null };
+      const inHall = x >= 6 && x <= 18 && y >= 2 && y <= 20;
+      if (!inHall) {
+        tile.kind = "rock"; // thick rock walls all around
+        tile.height = 6;
+      } else if (y <= 4 && Math.abs(x - 12) <= 3) {
+        tile.height = 2; // a raised stage for the portal
+      }
+      row.push(tile);
+    }
+    tiles.push(row);
+  }
+  for (const p of secretPillars) tiles[p.y][p.x].thing = "building";
+  for (const t of secretTablets) tiles[t.y][t.x].thing = "tablet";
+  for (const [x, y] of [[8, 19], [16, 19], [8, 4], [16, 4], [10, 2], [14, 2]]) tiles[y][x].thing = "brazier";
+  tiles[SECRET_PORTAL.y][SECRET_PORTAL.x].thing = "portal";
+  tiles[SECRET_EXIT.y][SECRET_EXIT.x].thing = "rope";
+  return tiles;
+}
+
+// ----- 3000 years ago: the battlefield of the Battle of the Spark -----
+
+const PAST_SIZE = 44;
+const PAST_START = { x: 22, y: 36 };
+const PAST_CAMP = { x: 22, y: 39 };    // the Spark Knights' camp, with their banner
+
+function makeBattlefield() {
+  const tiles = [];
+  for (let y = 0; y < PAST_SIZE; y++) {
+    const row = [];
+    for (let x = 0; x < PAST_SIZE; x++) {
+      const tile = { kind: "grass", height: 1, thing: null };
+      const edge = Math.min(x, y, PAST_SIZE - 1 - x, PAST_SIZE - 1 - y);
+      const r = hash(x, y, 77);
+      if (edge < 2 + noise(x, y, 5, 78) * 2) {
+        tile.kind = "water";
+        tile.height = -1;
+      } else {
+        tile.height = 1 + Math.floor(noise(x, y, 12, 79) * 2);
+        const nearCamp = Math.hypot(x - PAST_CAMP.x, y - PAST_CAMP.y) < 6;
+        if (nearCamp) tile.height = 1;
+        else if (r < 0.04) tile.thing = "tree";
+        else if (r < 0.06) tile.thing = "rock";
+      }
+      row.push(tile);
+    }
+    tiles.push(row);
+  }
+  tiles[PAST_CAMP.y][PAST_CAMP.x].thing = "banner";
+  return tiles;
+}
+
+// The waves of the Shadow Tyrant's army
+const battleWaves = [
+  { embers: 6, brutes: 0 },
+  { embers: 9, brutes: 2 },
+  { embers: 10, brutes: 4 },
+];

@@ -169,11 +169,11 @@ function spriteTexture(sprite, swaps) {
   const key = sprite.join("") + JSON.stringify(swaps || {});
   if (spriteCache.has(key)) return spriteCache.get(key);
   const canvas = document.createElement("canvas");
-  canvas.width = 16;
-  canvas.height = 16;
+  canvas.width = sprite[0].length;   // 16 for most sprites, 24 for the detailed ones
+  canvas.height = sprite.length;
   const pen = canvas.getContext("2d");
-  for (let y = 0; y < 16; y++) {
-    for (let x = 0; x < 16; x++) {
+  for (let y = 0; y < sprite.length; y++) {
+    for (let x = 0; x < sprite[y].length; x++) {
       const letter = sprite[y][x];
       if (letter !== ".") {
         pen.fillStyle = (swaps && swaps[letter]) || colours[letter];
@@ -801,6 +801,11 @@ function createTempleView(canvas) {
       const hero = makeSprite(heroFront, 1.3, { R: "#f6d04a", r: "#c8a030", h: "#f6d04a", s: "#ffe890", j: "#f6d04a", J: "#c8a030", n: "#c8a030", u: "#c8a030" });
       hero.position.set(0, 0.5, 0);
       group.add(hero);
+    } else if (type === "pillar") {
+      // An ancient stone pillar with a golden top
+      box(group, brickLook, 0, 0.1, 0, 0.8, 0.2, 0.8);
+      box(group, brickLook, 0, 1.3, 0, 0.55, 2.4, 0.55);
+      box(group, goldLook, 0, 2.55, 0, 0.75, 0.15, 0.75);
     } else if (type === "ruinHouse") {
       box(group, ruinLook, -0.3, 0.25, 0, 0.15, 0.5, 0.8);
       box(group, ruinLook, 0.1, 0.15, -0.35, 0.7, 0.3, 0.12);
