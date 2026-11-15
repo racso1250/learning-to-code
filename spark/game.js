@@ -7,6 +7,8 @@
 Object.assign(areaColours, {
   hub: {
     sky: 0xc8e0ff,
+    floor: ["#b8a890", "#988870", "#c8b8a0"],      // the plaza: soft sandstone
+    floorSide: ["#988870", "#786850", "#a89880"],
     grass: ["#6ccf5a", "#5abb48", "#86e070"], rock: ["#a8a0b8", "#928aa4", "#bcb4cc"],
     snow: ["#f8f8ff", "#e4e8f8", "#ffffff"], water: ["#3a8ae0", "#50a0f0", "#d0f0ff"],
     dirt: ["#a07a50", "#856040", "#b48c60"], stone: ["#928aa4", "#7a7290", "#a8a0b8"],
@@ -56,8 +58,8 @@ Object.assign(areaColours, {
 //   bloom       = how strongly bright things glow, and bloomThreshold = how bright they must be to glow
 //   spriteLight = how bright flat sprites are (a bit darker in gloomy worlds)
 Object.assign(areaMoods, {
-  hub: { skyTop: "#6a8af0", horizon: "#ffe4f0", sparkle: 0xfff6a0, sparkleKind: "pollen",
-    hemi: 0.62, sun: 0.7, light: 0.35, bloom: 0.35, bloomThreshold: 0.94 },
+  hub: { skyTop: "#3a4ac8", horizon: "#ffb88a", sparkle: 0xfff0a0, sparkleKind: "fireflies",
+    hemi: 0.5, sun: 0.8, sunColour: 0xffb070, light: 1.1, bloom: 0.75, bloomThreshold: 0.8, spriteLight: 0.92 },
   bloom: { skyTop: "#2a9a8a", horizon: "#d8ffe8", sparkle: 0xffffff, sparkleKind: "butterflies",
     hemi: 0.7, sun: 0.8, light: 0.6, bloom: 0.4, bloomThreshold: 0.9 },
   tide: { skyTop: "#0a2a3a", horizon: "#2a5a6a", sparkle: 0x9fe8ff, sparkleKind: "pollen",
@@ -80,6 +82,23 @@ Object.assign(thingSprites, {
     swaps: { m: "#1a3a6a", M: "#4a8ad8", v: "#9fe8ff", x: "#ffffff" } },
   crater: { sprite: craterSprite, size: 1.6, noShadow: true, glow: "rgba(255, 180, 60, 1)" },
 });
+
+// Make a colour darker: darker("#80c060", 0.7) is 70% as bright
+function darker(hex, amount) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * amount);
+  const g = Math.round(((n >> 8) & 255) * amount);
+  const b = Math.round((n & 255) * amount);
+  return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+}
+
+// The little cliff edges between steps used to be brown dirt, which looked like brown lines
+// across the grass. Now they're just a darker shade of the ground on top.
+for (const area of Object.keys(areaColours)) {
+  const c = areaColours[area];
+  c.dirt = c.grass.map((colour) => darker(colour, 0.8));
+  c.stone = c.rock.map((colour) => darker(colour, 0.72));
+}
 
 const monsterSprites = { blob: blobMonster, bat: batMonster, crab: crabMonster };
 

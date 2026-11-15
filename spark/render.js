@@ -144,7 +144,7 @@ function makeLooks(area) {
       grass: new THREE.MeshLambertMaterial({ map: pixelTexture(c.grass, 1, speckled) }),
       rock: new THREE.MeshLambertMaterial({ map: pixelTexture(c.rock, 3, speckled) }),
       snow: new THREE.MeshLambertMaterial({ map: pixelTexture(c.snow, 4, speckled) }),
-      temple: new THREE.MeshLambertMaterial({ map: pixelTexture(["#e8dcc0", "#b8a888", "#f6eed8"], 5, tiled) }),
+      temple: new THREE.MeshLambertMaterial({ map: pixelTexture(c.floor || ["#e8dcc0", "#b8a888", "#f6eed8"], 5, tiled) }),
       // Lava glows by itself ("Basic" ignores light); normal water is lit by the sun
       water: c.glowWater ? new THREE.MeshBasicMaterial({ map: water }) : new THREE.MeshLambertMaterial({ map: water }),
       deepWater: c.glowWater
@@ -154,7 +154,7 @@ function makeLooks(area) {
     sides: {
       dirt: new THREE.MeshLambertMaterial({ map: pixelTexture(c.dirt, 7, layered) }),
       stone: new THREE.MeshLambertMaterial({ map: pixelTexture(c.stone, 8, layered) }),
-      temple: new THREE.MeshLambertMaterial({ map: pixelTexture(["#d8ccb0", "#a89878", "#e8dcc0"], 9, layered) }),
+      temple: new THREE.MeshLambertMaterial({ map: pixelTexture(c.floorSide || ["#d8ccb0", "#a89878", "#e8dcc0"], 9, layered) }),
     },
   };
 }
@@ -425,6 +425,7 @@ function createTempleView(canvas) {
 
     // Each area has its own lighting: dark worlds make your spark-light stand out
     skyLight.intensity = mood.hemi !== undefined ? mood.hemi : 0.8;
+    sun.color.set(mood.sunColour !== undefined ? mood.sunColour : 0xffe8c8);
     sun.intensity = mood.sun !== undefined ? mood.sun : 0.85;
     playerLightStrength = mood.light !== undefined ? mood.light : 1;
     spriteLight = mood.spriteLight !== undefined ? mood.spriteLight : 1;
