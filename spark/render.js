@@ -145,8 +145,11 @@ function makeLooks(area) {
       rock: new THREE.MeshLambertMaterial({ map: pixelTexture(c.rock, 3, speckled) }),
       snow: new THREE.MeshLambertMaterial({ map: pixelTexture(c.snow, 4, speckled) }),
       temple: new THREE.MeshLambertMaterial({ map: pixelTexture(["#e8dcc0", "#b8a888", "#f6eed8"], 5, tiled) }),
-      water: new THREE.MeshLambertMaterial({ map: water }),
-      deepWater: new THREE.MeshLambertMaterial({ map: water, color: 0x9aa8d8 }), // darker far from shore
+      // Lava glows by itself ("Basic" ignores light); normal water is lit by the sun
+      water: c.glowWater ? new THREE.MeshBasicMaterial({ map: water }) : new THREE.MeshLambertMaterial({ map: water }),
+      deepWater: c.glowWater
+        ? new THREE.MeshBasicMaterial({ map: water, color: 0xd8b0a0 })
+        : new THREE.MeshLambertMaterial({ map: water, color: 0x9aa8d8 }), // darker far from shore
     },
     sides: {
       dirt: new THREE.MeshLambertMaterial({ map: pixelTexture(c.dirt, 7, layered) }),
@@ -242,6 +245,23 @@ function createTempleView(canvas) {
   scene.fog = new THREE.Fog(0x9fd0f0, 20, 40);
   const camera = new THREE.PerspectiveCamera(30, 1.5, 0.1, 200);
 
+  // BLOOM: bright things get a soft glow around them, like in modern games.
+  // (If the bloom add-on didn't load, we just draw normally.)
+  let composer = null;
+  let bloomPass = null;
+  if (THREE.EffectComposer && THREE.UnrealBloomPass) {
+    composer = new THREE.EffectComposer(renderer);
+    composer.addPass(new THREE.RenderPass(scene, camera));
+    bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(RENDER_WIDTH, 267), 0.7, 0.5, 0.75);
+    composer.addPass(bloomPass);
+  }
+
+  // The player is a spark, so they light up everything around them!
+  const playerLight = new THREE.PointLight(0xffb050, 1, 9, 2);
+  scene.add(playerLight);
+  let playerLightStrength = 1;
+  let embersOn = false;
+
   const skyLight = new THREE.HemisphereLight(0xfff6e8, 0x405068, 0.8);
   scene.add(skyLight);
   let timeOfDay = 1;
@@ -266,6 +286,7 @@ function createTempleView(canvas) {
   let seaTexture = null;
   let spirit = null;
   let sky = null;
+  let stars = null;
   let cullTimer = 0;
   let clouds = [];
   let sparkles = null;
@@ -341,6 +362,11 @@ function createTempleView(canvas) {
     const flat = makeSprite(look.sprite, look.size, look.swaps);
     flat.position.set(x, top, y);
     flat.userData.spins = look.spins;      // like the tear, which slowly swirls
+    if (look.spins) {
+      // Spin around the middle (not the bottom), so it doesn't dip into the ground
+      flat.center.set(0.5, 0.5);
+      flat.position.y = top + look.size / 2;
+    }
     flat.userData.bobs = look.bobs;        // like spark crystals, which float up and down
     flat.userData.top = top;
     if (look.glow) {
@@ -396,6 +422,16 @@ function createTempleView(canvas) {
     looks = makeLooks(area);
     const mood = areaMoods[area];
     dayColour.set(mood.horizon);
+
+    // Each area has its own lighting: dark worlds make your spark-light stand out
+    skyLight.intensity = mood.hemi !== undefined ? mood.hemi : 0.8;
+    sun.intensity = mood.sun !== undefined ? mood.sun : 0.85;
+    playerLightStrength = mood.light !== undefined ? mood.light : 1;
+    spriteLight = mood.spriteLight !== undefined ? mood.spriteLight : 1;
+    if (bloomPass) {
+      bloomPass.strength = mood.bloom !== undefined ? mood.bloom : 0.6;
+      bloomPass.threshold = mood.bloomThreshold !== undefined ? mood.bloomThreshold : 0.8;
+    }
     scene.background = new THREE.Color(mood.horizon);
     scene.fog = new THREE.Fog(mood.horizon, 20, 42);
 
@@ -415,6 +451,24 @@ function createTempleView(canvas) {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(skyPaint), side: THREE.BackSide, fog: false })
     );
     worldGroup.add(sky);
+
+    // Twinkling stars in the sky of the darkest worlds
+    stars = null;
+    if (mood.stars) {
+      const starPositions = new Float32Array(400 * 3);
+      for (let i = 0; i < 400; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const up = 0.15 + Math.random() * 0.85;
+        const across = Math.sqrt(1 - up * up);
+        starPositions[i * 3] = Math.cos(angle) * across * 120;
+        starPositions[i * 3 + 1] = up * 120;
+        starPositions[i * 3 + 2] = Math.sin(angle) * across * 120;
+      }
+      const starShape = new THREE.BufferGeometry();
+      starShape.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+      stars = new THREE.Points(starShape, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: false, fog: false, transparent: true }));
+      worldGroup.add(stars);
+    }
 
     // Invisible clouds that only cast SHADOWS, drifting across the ground
     clouds = [];
@@ -575,6 +629,19 @@ function createTempleView(canvas) {
   }
 
   const mountain = typeof temples !== "undefined" ? temples[0] : null;
+
+  // ----- Embers that drift up from you, because you're a spark -----
+  const emberLook = new THREE.SpriteMaterial({ map: glowTexture("rgba(255, 200, 90, 1)"), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+  const embers = [];
+  for (let i = 0; i < 36; i++) {
+    const ember = new THREE.Sprite(emberLook);
+    ember.visible = false;
+    ember.userData.life = 0;
+    scene.add(ember);
+    embers.push(ember);
+  }
+  let emberTimer = 0;
+  let nextEmber = 0;
 
   // ----- Effects -----
 
@@ -807,7 +874,7 @@ function createTempleView(canvas) {
         let halo = null;
         if (v.glow) {
           halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(v.glow), blending: THREE.AdditiveBlending, depthWrite: false }));
-          halo.scale.setScalar(1.4);
+          halo.scale.setScalar(v.float ? 0.75 : 1.4); // sparklings get a small glow
           worldGroup.add(halo);
         }
         villagers.set(v.id, { sprite: flat, halo: halo, float: v.float, shadow: addShadowBlob(v.x, 0, v.y, v.float ? 0.4 : 1), x: v.x, y: v.y });
@@ -915,6 +982,7 @@ function createTempleView(canvas) {
     target.set(state.x, 0, state.y);
     swimming = state.swimming;
     inBoat = state.swimming && state.boat;
+    embersOn = Boolean(state.embers);
     if (state.facing !== facing || state.front !== playerFront || state.swaps !== playerSwaps) {
       facing = state.facing;
       playerFront = state.front;
@@ -970,6 +1038,7 @@ function createTempleView(canvas) {
     const height = canvas.clientHeight;
     if (width !== lastWidth || height !== lastHeight) {
       renderer.setSize(RENDER_WIDTH, Math.round((RENDER_WIDTH * height) / width), false);
+      if (composer) composer.setSize(RENDER_WIDTH, Math.round((RENDER_WIDTH * height) / width));
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       lastWidth = width;
@@ -1089,6 +1158,38 @@ function createTempleView(canvas) {
       if (kind === "fireflies" && !dayNight) sparkles.material.opacity = 0.6 + Math.sin(time * 4) * 0.4; // they blink!
     }
 
+    // Your spark-light follows you and flickers like a flame
+    playerLight.position.set(position.x, position.y + 0.6, position.z);
+    playerLight.intensity = playerLightStrength * (0.9 + Math.sin(time * 13) * 0.06 + Math.sin(time * 7.3) * 0.05);
+
+    // Embers float up from you and fade away
+    if (embersOn) {
+      emberTimer -= dt;
+      if (emberTimer <= 0) {
+        emberTimer = distance > 0.05 ? 0.03 : 0.12; // more embers while you move
+        const ember = embers[nextEmber];
+        nextEmber = (nextEmber + 1) % embers.length;
+        ember.visible = true;
+        ember.userData.life = 1;
+        ember.position.set(position.x + (Math.random() - 0.5) * 0.4, position.y + 0.3 + Math.random() * 0.3, position.z + (Math.random() - 0.5) * 0.3);
+        ember.userData.drift = (Math.random() - 0.5) * 0.4;
+      }
+    }
+    for (const ember of embers) {
+      if (!ember.visible) continue;
+      ember.userData.life -= dt * 1.4;
+      ember.position.y += dt * 0.9;
+      ember.position.x += ember.userData.drift * dt;
+      ember.scale.setScalar(Math.max(0.01, ember.userData.life) * 0.3);
+      if (ember.userData.life <= 0) ember.visible = false;
+    }
+
+    // Stars twinkle and stay in the sky as the camera moves
+    if (stars) {
+      stars.position.copy(camera.position);
+      stars.material.opacity = 0.75 + Math.sin(time * 3) * 0.25;
+    }
+
     // Windmill sails spin
     for (const sail of sails) sail.rotation.z += dt * 1.2;
 
@@ -1176,7 +1277,8 @@ function createTempleView(canvas) {
     sun.position.set(cameraTarget.x - 6, cameraTarget.y + 12, cameraTarget.z + 5);
     sun.target.position.copy(cameraTarget);
 
-    renderer.render(scene, camera);
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
   }
   animate();
 

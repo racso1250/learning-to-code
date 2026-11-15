@@ -25,6 +25,7 @@ Object.assign(areaColours, {
   },
   ember: {
     sky: 0xff7a3a,
+    glowWater: true, // the "water" here is glowing lava
     grass: ["#5a4a48", "#4a3a38", "#6a5a56"], rock: ["#3d3036", "#2c2228", "#4e3e46"],
     snow: ["#f4f8fc", "#dfe8f2", "#ffffff"], water: ["#ff6a1a", "#ffa030", "#ffe070"],
     dirt: ["#3d3036", "#2c2228", "#4e3e46"], stone: ["#3d3036", "#2c2228", "#4e3e46"],
@@ -49,21 +50,33 @@ Object.assign(areaColours, {
   },
 });
 
+// How each world looks and feels.
+//   hemi / sun  = how bright the sky light and sunlight are
+//   light       = how brightly YOU glow (dark worlds make your spark-light stand out)
+//   bloom       = how strongly bright things glow, and bloomThreshold = how bright they must be to glow
+//   spriteLight = how bright flat sprites are (a bit darker in gloomy worlds)
 Object.assign(areaMoods, {
-  hub: { skyTop: "#6a8af0", horizon: "#ffe4f0", sparkle: 0xfff6a0, sparkleKind: "pollen" },
-  bloom: { skyTop: "#2a9a8a", horizon: "#d8ffe8", sparkle: 0xffffff, sparkleKind: "butterflies" },
-  tide: { skyTop: "#0a2a3a", horizon: "#3a7a8a", sparkle: 0x9fe8ff, sparkleKind: "pollen" },
-  ember: { skyTop: "#3a0a0a", horizon: "#ff7a3a", sparkle: 0xff8a3a, sparkleKind: "embers" },
-  frost: { skyTop: "#5a8ad8", horizon: "#f0f8ff", sparkle: 0xffffff, sparkleKind: "pollen" },
-  shadow: { skyTop: "#1a0f2a", horizon: "#5a3a6a", sparkle: 0xc08aff, sparkleKind: "fireflies" },
-  star: { skyTop: "#05051a", horizon: "#3a2a6a", sparkle: 0xffffff, sparkleKind: "fireflies" },
+  hub: { skyTop: "#6a8af0", horizon: "#ffe4f0", sparkle: 0xfff6a0, sparkleKind: "pollen",
+    hemi: 0.62, sun: 0.7, light: 0.35, bloom: 0.35, bloomThreshold: 0.94 },
+  bloom: { skyTop: "#2a9a8a", horizon: "#d8ffe8", sparkle: 0xffffff, sparkleKind: "butterflies",
+    hemi: 0.7, sun: 0.8, light: 0.6, bloom: 0.4, bloomThreshold: 0.9 },
+  tide: { skyTop: "#0a2a3a", horizon: "#2a5a6a", sparkle: 0x9fe8ff, sparkleKind: "pollen",
+    hemi: 0.45, sun: 0.4, light: 1.8, bloom: 0.8, bloomThreshold: 0.65, spriteLight: 0.85 },
+  ember: { skyTop: "#2a0505", horizon: "#c8502a", sparkle: 0xff8a3a, sparkleKind: "embers",
+    hemi: 0.45, sun: 0.45, light: 1.4, bloom: 0.7, bloomThreshold: 0.7, spriteLight: 0.9 },
+  frost: { skyTop: "#5a8ad8", horizon: "#f0f8ff", sparkle: 0xffffff, sparkleKind: "pollen",
+    hemi: 0.8, sun: 0.75, light: 0.7, bloom: 0.3, bloomThreshold: 0.95 },
+  shadow: { skyTop: "#0a0518", horizon: "#3a2050", sparkle: 0xc08aff, sparkleKind: "fireflies",
+    hemi: 0.36, sun: 0.28, light: 2.2, bloom: 0.8, bloomThreshold: 0.62, spriteLight: 0.78, stars: true },
+  star: { skyTop: "#02020c", horizon: "#24184a", sparkle: 0xffffff, sparkleKind: "fireflies",
+    hemi: 0.36, sun: 0.26, light: 2.4, bloom: 0.85, bloomThreshold: 0.62, spriteLight: 0.85, stars: true },
 });
 
 Object.assign(thingSprites, {
   spark: { sprite: sparkCrystal, size: 0.8, bobs: true, glow: "rgba(255, 230, 100, 0.8)" },
   heartPickup: { sprite: heartPickup, size: 0.7, bobs: true, glow: "rgba(255, 90, 110, 0.6)" },
   tearHeart: { sprite: tearHeart, size: 1.4, bobs: true, glow: "rgba(255, 240, 150, 1)" },
-  tear: { sprite: riftSprite, size: 2.2, spins: true, noShadow: true, glow: "rgba(150, 220, 255, 0.9)",
+  tear: { sprite: riftSprite, size: 2.2, spins: true, noShadow: true, glow: "rgba(120, 200, 255, 0.4)",
     swaps: { m: "#1a3a6a", M: "#4a8ad8", v: "#9fe8ff", x: "#ffffff" } },
   crater: { sprite: craterSprite, size: 1.6, noShadow: true, glow: "rgba(255, 180, 60, 1)" },
 });
@@ -455,7 +468,7 @@ function updateSparklings(now) {
       sprite: sparklingSprite,
       size: 0.8,
       float: true,
-      glow: "rgba(255, 240, 140, 0.9)",
+      glow: "rgba(255, 240, 140, 0.45)",
     });
   }
   // Each sparkling zaps the nearest monster every so often
@@ -786,6 +799,7 @@ function draw() {
     back: sparkBack,
     swimming: tiles[playerY][playerX].kind === "water",
     enemies: enemies,
+    embers: true, // you're a spark: embers float up from you
   });
   view.syncVillagers(people);
 }
