@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Space Explorers</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="../dragon/style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=2">
+  </head>
+  <body>
+    <h1>Space Explorers</h1>
+
+    <div class="hud">
+      <span id="hearts"></span>
+      <span id="fuel"></span>
+      <span id="scrap"></span>
+      <span id="hull"></span>
+      <span id="phase"></span>
+    </div>
+    <p id="place">Lost in space</p>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <canvas id="flat"></canvas>
+      <div id="crosshair">+</div>
+      <canvas id="radar" width="72" height="72"></canvas>
+      <img id="scare-face" alt="" hidden>
+      <div class="vignette"></div>
+      <div id="dread"></div>
+      <div id="hurt"></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <!-- Story cards: big moments in the story -->
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <!-- The ship's workshop: fix the ship, build upgrades, rest, or launch -->
+      <div id="ship-menu" class="overlay" hidden>
+        <h2>The ship's workshop</h2>
+        <div id="menu-list"></div>
+        <p class="keys">Click a button. Press E to close.</p>
+      </div>
+
+      <div id="paused" class="overlay" hidden>
+        <h2>Paused</h2>
+        <p>Press P to keep playing.</p>
+      </div>
+
+      <div id="intro" class="overlay">
+        <p class="small-title">A first-person space horror</p>
+        <h2 class="logo">Space Explorers</h2>
+        <p>You and your crew are lost in space. By day, search each planet for fuel and a way home. But be back at the ship before dark. Something lives on these planets. It only comes out at night, and it is very good at hiding.</p>
+        <p class="keys">Mouse (or left and right arrows): look &nbsp; WASD: move &nbsp; Click or Space: fire &nbsp; E: use the ship &nbsp; N: start the night early<br>1: build a turret &nbsp; 2: build a wall &nbsp; 3: build a lamp &nbsp; P: pause</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+
+    <p class="help">At night you can only see what your torch points at. Demons hide in the dark: watch for their eyes. The small ones freeze when you look at them, and creep closer when you turn away. Light keeps them slow, so build lamps!</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="planets.js?v=2"></script>
+    <script src="../dragon/pixels.js?v=3"></script>
+    <script src="../dragon/ground.js?v=3"></script>
+    <script src="art.js?v=2"></script>
+    <script src="game.js?v=3"></script>
+    <script src="view3d.js?v=3"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
