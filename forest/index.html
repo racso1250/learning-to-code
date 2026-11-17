@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nightwood</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="../dragon/style.css?v=3">
+    <link rel="stylesheet" href="../space/style.css?v=3">
+    <style>
+      /* Nightwood: sickly greens in the dark */
+      body { background: radial-gradient(ellipse at top, #12261c, #030604 70%); }
+      h1 { background: linear-gradient(90deg, #7ad88a, #e8ffe0, #7ad88a); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 0 10px rgba(120, 216, 138, 0.5)); }
+      .hud { color: #a8e6b0; }
+      .screen { border-color: #1f3a2a; box-shadow: 0 0 40px rgba(60, 140, 80, 0.2); }
+      .logo { background: linear-gradient(#e8ffe0, #7ad88a 45%, #1f5a34); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 3px 0 #06140a) drop-shadow(0 0 14px rgba(120, 216, 138, 0.6)); }
+      button { background: #1f6a3a; border-color: #a8e6b0; }
+      #compass { position: absolute; right: 12px; top: 12px; font-size: 9px; color: #ffd84a; text-align: center; pointer-events: none; text-shadow: 1px 1px 0 #000; }
+      #arrow { display: block; font-size: 22px; line-height: 1; }
+      #intro { background: rgba(2, 6, 4, 0.78); }
+    </style>
+  </head>
+  <body>
+    <h1>Nightwood</h1>
+
+    <div class="hud">
+      <span id="hearts"></span>
+      <span id="keys"></span>
+      <span id="wood"></span>
+      <span id="battery"></span>
+      <span id="fire"></span>
+    </div>
+    <p id="place">Lost in the forest</p>
+
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="crosshair">+</div>
+      <div id="compass"><span id="arrow">▲</span>camp</div>
+      <div id="dread"></div>
+      <div id="hurt"></div>
+      <img id="scare-face" alt="" hidden>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+      <div id="intro" class="overlay">
+        <p class="small-title">A first-person forest horror</p>
+        <h2 class="logo">Nightwood</h2>
+        <p>You are lost in a forest that does not want you to leave. Find the six rune keys to open the gate. Keep your campfire burning at night: the things in the trees are afraid of fire.</p>
+        <p class="keys">Mouse (or left and right arrows): look &nbsp; WASD: move &nbsp; Shift: run<br>Space or click: flash your torch at a monster &nbsp; E: feed the fire &nbsp; P: pause</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+
+    <p class="help">The yellow arrow always points back to your camp. Monsters will not come into the firelight. Some freeze while you look at them. Others hide behind trees and jump out.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="map.js?v=1"></script>
+    <script src="../dragon/pixels.js?v=3"></script>
+    <script src="../dragon/ground.js?v=3"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
