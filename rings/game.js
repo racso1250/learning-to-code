@@ -255,7 +255,7 @@ function hurtBoss(power) {
 // Hurt everything near a spot (monsters and the giant)
 function strike(x, y, reach, power) {
   for (const m of monsters) if (m.dead <= 0 && Math.hypot(m.x - x, m.y - 6 - y) < reach + 6) hurtMonster(m, power, player.x, player.y);
-  if (boss && Math.hypot(boss.x - x, boss.y - 12 - y) < reach + 22) hurtBoss(power + 1);      // your blows count double against a giant
+  if (boss && Math.hypot(boss.x - x, boss.y - 12 - y) < reach + 22) hurtBoss(power);
 }
 function hurtPlayer(amount, fromX, fromY) {
   if (player.safe > 0 || player.shield > 0) return;
@@ -483,15 +483,15 @@ function update(dt) {
     } else if (boss.awake) {
       boss.t += dt;
       const angry = boss.hp < boss.def.hp / 2;
-      const speed = (17 + boss.def.id) * (angry ? 1.2 : 1);       // giants are slow: you can always walk away from one
+      const speed = (24 + boss.def.id * 2) * (angry ? 1.4 : 1);
       if (far > 22) {
         if (!solidAt(boss.x + (dx / far) * speed * dt, boss.y)) boss.x += (dx / far) * speed * dt;
         if (!solidAt(boss.x, boss.y + (dy / far) * speed * dt)) boss.y += (dy / far) * speed * dt;
       }
       if ((boss.cool -= dt) <= 0) {
-        boss.cool = angry ? 3 : 3.8;
-        const count = angry ? 8 : 6;
-        for (let i = 0; i < count; i++) shots.push({ x: boss.x, y: boss.y - 6, vx: Math.cos((i / count) * 6.283 + boss.t) * 42, vy: Math.sin((i / count) * 6.283 + boss.t) * 42, life: 2.4, foe: true, colour: "#b03ad8" });
+        boss.cool = angry ? 1.9 : 2.8;
+        const count = angry ? 12 : 8;
+        for (let i = 0; i < count; i++) shots.push({ x: boss.x, y: boss.y - 6, vx: Math.cos((i / count) * 6.283 + boss.t) * 58, vy: Math.sin((i / count) * 6.283 + boss.t) * 58, life: 2.6, foe: true, colour: "#b03ad8" });
         shake = 0.2;
       }
       if (far < 20) hurtPlayer(1, boss.x, boss.y);

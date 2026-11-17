@@ -35,11 +35,11 @@ const SPEC = {
     },
     // Each ring is guarded by a giant in the middle of its land
     bosses: [
-      { id: 0, name: "The Cinder Brute", look: "lavaBrute", hp: 12, region: "cinder" },
-      { id: 1, name: "The Frost Giant", look: "frostGiant", hp: 16, region: "frost" },
-      { id: 2, name: "The Storm Mother", look: "broodmother", hp: 20, region: "gale" },
-      { id: 3, name: "The Stone Giant", look: "sandGiant", hp: 24, region: "stone" },
-      { id: 4, name: "Sauron", look: "shadowKing", hp: 34, region: "keep" },
+      { id: 0, name: "The Cinder Brute", look: "lavaBrute", hp: 18, region: "cinder" },
+      { id: 1, name: "The Frost Giant", look: "frostGiant", hp: 26, region: "frost" },
+      { id: 2, name: "The Storm Mother", look: "broodmother", hp: 32, region: "gale" },
+      { id: 3, name: "The Stone Giant", look: "sandGiant", hp: 40, region: "stone" },
+      { id: 4, name: "Sauron", look: "shadowKing", hp: 60, region: "keep" },
     ],
   },
 };
