@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jelly Town</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <style>
+      /* Jelly Town: bright, sunny and silly */
+      body { margin: 0; padding: 24px 16px; min-height: 100vh; text-align: center; font-family: "Press Start 2P", monospace; color: #ffffff; background: linear-gradient(#58b8f0, #2a78c8); }
+      h1 { margin: 0 0 14px; font-size: 26px; color: #fff27a; text-shadow: 3px 3px 0 #e0508a, 0 0 14px rgba(255, 242, 122, 0.6); }
+      h2 { margin: 0 0 10px; font-size: 13px; color: #fff27a; }
+      a { color: #fff27a; font-size: 10px; }
+      .hud { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; max-width: 960px; margin: 0 auto 8px; font-size: 10px; }
+      #coins { color: #fff27a; font-size: 13px; }
+      .screen { position: relative; max-width: 960px; margin: 0 auto; border: 4px solid #ffffff; border-radius: 14px; overflow: hidden; background: #000; }
+      #game { display: block; width: 100%; aspect-ratio: 3 / 2; }
+      #toast, #prompt { position: absolute; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 12px; border-radius: 10px; background: rgba(20, 40, 90, 0.85); border: 2px solid #fff27a; font-size: 10px; line-height: 1.6; max-width: 80%; pointer-events: none; }
+      #toast { top: 10%; color: #fff27a; }
+      #prompt { bottom: 7%; border-color: #ffffff; font-size: 9px; }
+      #guide { position: absolute; right: 14px; top: 12px; font-size: 9px; color: #fff27a; text-shadow: 1px 1px 0 #000; pointer-events: none; text-align: center; }
+      #arrow { display: block; font-size: 24px; line-height: 1; }
+      .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px 8%; background: rgba(20, 50, 110, 0.86); font-size: 11px; line-height: 1.8; }
+      .overlay[hidden], #toast[hidden], #prompt[hidden], #guide[hidden] { display: none; }
+      .overlay p { margin: 0; }
+      .logo { font-size: clamp(26px, 6vw, 54px); color: #fff27a; text-shadow: 4px 4px 0 #e0508a; margin: 0; }
+      .keys { font-size: 8px; line-height: 2; color: #d8f0ff; }
+      button { font-family: inherit; font-size: 11px; padding: 10px 16px; border: 2px solid #ffffff; border-radius: 10px; background: #e0508a; color: #ffffff; cursor: pointer; }
+      button:hover { box-shadow: 0 0 12px #fff27a; }
+      button:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+      #shop-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; max-height: 66%; overflow-y: auto; }
+      #shop-list button { font-size: 9px; padding: 8px; background: #3a6ad8; text-align: left; line-height: 1.6; }
+      #shop-list button.on { background: #3aa858; }
+      .help { max-width: 960px; margin: 12px auto; font-size: 9px; line-height: 1.8; }
+    </style>
+  </head>
+  <body>
+    <h1>Jelly Town</h1>
+    <div class="hud">
+      <span id="coins">0 coins</span>
+      <span id="job">No job right now</span>
+    </div>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="guide" hidden><span id="arrow">▲</span><span id="far"></span></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+      <div id="shop" class="overlay" hidden>
+        <h2>The Wobble Shop</h2>
+        <div id="shop-list"></div>
+        <p class="keys">Click to buy or wear. Press E to close.</p>
+      </div>
+      <div id="intro" class="overlay">
+        <h2 class="logo">Jelly Town</h2>
+        <p>You are a wobbly jelly person in a wobbly town. Do jobs to earn coins: deliver pizzas, collect the bins, move crates, drive the taxi. Throw beach balls, bounce, flop and dance. Fix the broken rocket to fly to the Moon, and look for the secret hidden in the mountain. Spend them on hats, colours, a pet and the biggest house in town.</p>
+        <p class="keys">Mouse (or left and right arrows): look &nbsp; WASD: wobble about &nbsp; Space: jump &nbsp; E: use things, get in a car<br>In a car: W drive, S reverse, A and D (or left and right arrows) steer<br>F or click: pick up and throw &nbsp; Q: flop over &nbsp; G: dance</p>
+        <button id="start">Play</button>
+      </div>
+    </div>
+    <p class="help">Look for the spinning gold stars: that's where the jobs and the shop are. Bounce on the trampolines in the park, and watch out for traffic! There are 12 presents hidden around the world.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="game.js?v=4"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
