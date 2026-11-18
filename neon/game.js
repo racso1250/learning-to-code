@@ -95,10 +95,11 @@ const tiles = Array.from({ length: CH }, () => new Uint8Array(CW));
 const fromMid = (tx, ty) => Math.hypot(tx + 0.5 - MID, ty + 0.5 - MID);
 const turnOf = (tx, ty) => ((Math.atan2(ty + 0.5 - MID, tx + 0.5 - MID) * 180) / Math.PI + 360) % 360;      // the angle round the city, in degrees
 const polar = (deg, r) => ({ x: MID + Math.cos((deg * Math.PI) / 180) * r, y: MID + Math.sin((deg * Math.PI) / 180) * r });
+const RINGS = [23, 45, 67, 89, 102.5];        // how far out each ring boulevard is, in squares
 const PARKS = [
-  { name: "Clover Park", at: polar(108, 34), r: 9, kinds: [0, 7, 3], lv: [2, 5] },
-  { name: "Mirror Pond", at: polar(45, 56), r: 10, kinds: [2, 5], lv: [7, 12], pond: true },
-  { name: "Windy Green", at: polar(195, 56), r: 10, kinds: [7, 3, 0], lv: [10, 16] },
+  { name: "Clover Park", at: polar(108, 34), r: 11, kinds: [0, 7, 3], lv: [2, 5] },
+  { name: "Mirror Pond", at: polar(45, 56), r: 11, kinds: [2, 5], lv: [7, 12], pond: true },
+  { name: "Windy Green", at: polar(195, 56), r: 11, kinds: [7, 3, 0], lv: [10, 16] },
   { name: "Ember Yard", at: polar(255, 78), r: 11, kinds: [1, 4], lv: [14, 22] },
   { name: "Frost Garden", at: polar(315, 78), r: 11, kinds: [5, 2, 4], lv: [18, 27], pond: true },
   { name: "Gloom Garden", at: polar(160, 93), r: 9, kinds: [6, 3, 7, 0, 1, 2, 4, 5], lv: [24, 36] },
@@ -115,11 +116,11 @@ for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
   if (d > CITY_R) kind = OUT;
   else if (d < 16) kind = PLAZA;
   else {
-    // ring boulevards (3 squares wide), ring lanes (2 wide), avenues and lanes running outwards
-    let road = [23, 45, 67, 89, 102.5].some((r) => Math.abs(d - r) < 1.5) || [34, 56, 78].some((r) => Math.abs(d - r) < 1);
-    for (let k = 0; k < 24 && !road; k++) {
-      const a = (k * Math.PI) / 12, along = dx * Math.cos(a) + dy * Math.sin(a), off = Math.abs(dy * Math.cos(a) - dx * Math.sin(a));
-      road = along > 0 && (k % 2 === 0 ? off < 1.5 : off < 1 && d > 45);
+    // five ring boulevards, and twelve avenues running outwards (all 3 squares wide)
+    let road = RINGS.some((r) => Math.abs(d - r) < 1.5);
+    for (let k = 0; k < 12 && !road; k++) {
+      const a = (k * Math.PI) / 6, along = dx * Math.cos(a) + dy * Math.sin(a), off = Math.abs(dy * Math.cos(a) - dx * Math.sin(a));
+      road = along > 0 && off < 1.5;
     }
     if (road) kind = STREET;
     else if (Math.abs(y + 0.5 - (MID - 36 + Math.sin(x / 14) * 5)) < 2.5) kind = POND;        // the river (streets cross it on bridges)
@@ -136,21 +137,20 @@ for (const park of PARKS) {
 for (let y = MID - 2; y < MID + 2; y++) for (let x = MID - 2; x < MID + 2; x++) tiles[y][x] = WALL;      // the tower
 // Fill every empty lot with buildings, packed side by side like city terraces
 const buildings = [];
-const SIZES = [[10, 7], [8, 8], [9, 6], [7, 8], [7, 7], [8, 5], [6, 6], [7, 5], [5, 6], [6, 4], [5, 5], [4, 4], [4, 3], [3, 3]];
+const SIZES = [[8, 8], [8, 6], [6, 8], [6, 6], [6, 4], [4, 6], [4, 4], [4, 3], [3, 4], [3, 3]];       // biggest first, so the rows come out regular
 for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
   if (tiles[y][x] !== LOT) continue;
-  const first = Math.floor(hash(x, y, 9) * 5);
   let placed = false;
   for (let n = 0; n < SIZES.length && !placed; n++) {
-    const [w, h] = SIZES[(n + first) % SIZES.length];
+    const [w, h] = SIZES[n];
     let fits = x + w <= CW && y + h <= CH;
     for (let ty = y; ty < y + h && fits; ty++) for (let tx = x; tx < x + w && fits; tx++) fits = tiles[ty][tx] === LOT;
     if (!fits) continue;
     for (let ty = y; ty < y + h; ty++) for (let tx = x; tx < x + w; tx++) tiles[ty][tx] = WALL;
-    buildings.push({ x: x, y: y, w: w, h: h, floors: 4 + Math.floor(hash(x, y, 10) * 4) + (fromMid(x, y) < 45 ? 2 : 0), tint: Math.floor(hash(x, y, 11) * 4), shop: Math.floor(hash(x, y, 12) * 3), lit: hash(x, y, 13) < 0.6, cafe: false });
+    buildings.push({ x: x, y: y, w: w, h: h, floors: (fromMid(x, y) < 45 ? 7 : fromMid(x, y) < 67 ? 6 : 5) + (hash(x, y, 10) < 0.3 ? 1 : 0), tint: Math.floor(hash(x, y, 11) * 2), shop: Math.floor(hash(x, y, 12) * 3), lit: hash(x, y, 13) < 0.6, cafe: false });
     placed = true;
   }
-  if (!placed) tiles[y][x] = hash(x, y, 3) < 0.22 ? TREE : YARD;       // a little courtyard
+  if (!placed) tiles[y][x] = YARD;       // (a bit of clean pavement between buildings)
 }
 // Cafes: the building nearest each of these spots that has a street along its south side
 const cafes = [];
@@ -161,11 +161,11 @@ for (const [deg, r] of [[97, 49], [7, 49], [187, 49], [277, 49], [52, 71], [142,
   cafes.push({ x: (best.x + best.w / 2) * TILE, y: (best.y + best.h) * TILE + 9 });
 }
 const lamps = [], trees = [];
-for (let y = 1; y < CH - 1; y++) for (let x = 1; x < CW - 1; x++) {
-  if (tiles[y][x] === TREE) trees.push({ x: x * TILE + 8, y: y * TILE + 8 });
-  if (tiles[y][x] !== STREET || hash(x, y, 40) > 0.045) continue;
-  const side = [[0, -1], [1, 0], [0, 1], [-1, 0]].find(([ax, ay]) => tiles[y + ay][x + ax] === WALL);
-  if (side) lamps.push({ x: x * TILE + 8 + side[0] * 6, y: y * TILE + 8 + side[1] * 6 });
+for (let y = 1; y < CH - 1; y++) for (let x = 1; x < CW - 1; x++) if (tiles[y][x] === TREE) trees.push({ x: x * TILE + 8, y: y * TILE + 8 });
+// Street lamps stand in neat rows along the kerbs of the ring boulevards
+for (const r of RINGS.slice(0, 4)) for (let k = 0; k < 24; k++) {
+  const spot = polar(k * 15 + 7.5, r + (k % 2 ? 1.75 : -1.75));
+  lamps.push({ x: spot.x * TILE, y: spot.y * TILE });
 }
 const tileAt = (px, py) => {
   const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
@@ -175,6 +175,157 @@ const solid = (px, py) => tileAt(px, py) >= POND;
 const canStand = (x, y) => !solid(x - 4, y - 5) && !solid(x + 4, y - 5) && !solid(x - 4, y + 1) && !solid(x + 4, y + 1);
 const START = { x: MID * TILE + 8, y: (MID + 45) * TILE + 8 };
 const OFFICIAL = { x: MID * TILE, y: (MID + 7) * TILE, name: "League Official Vera", outfit: { skin: 2, hairStyle: 1, hair: 9, hat: 0, hatColour: 0, topStyle: 2, top: 1, bottomStyle: 0, bottom: 1, shoes: 0 } };
+
+// ----- The map -----
+// A little picture of the whole city, painted once: roads, parks, the river, cafes and the tower.
+// Two map pixels are one square of the city.
+const cityMap = makeCanvas(CW * 2, CH * 2);
+(function () {
+  const g = cityMap.getContext("2d"), mid = MID * 2;
+  g.fillStyle = "#2c4a34";
+  g.fillRect(0, 0, CW * 2, CH * 2);
+  g.fillStyle = "#b4a992";
+  g.beginPath();
+  g.arc(mid, mid, CITY_R * 2 + 2, 0, 6.2832);
+  g.fill();
+  g.save();
+  g.beginPath();
+  g.arc(mid, mid, CITY_R * 2, 0, 6.2832);
+  g.clip();
+  g.strokeStyle = "#4a90e0";
+  g.lineWidth = 10;
+  g.beginPath();
+  for (let x = 0; x <= CW; x++) g.lineTo(x * 2, (MID - 36 + Math.sin(x / 14) * 5) * 2);
+  g.stroke();
+  g.restore();
+  g.strokeStyle = "#f6f2e8";
+  g.lineWidth = 6;
+  for (const r of RINGS) {
+    g.beginPath();
+    g.arc(mid, mid, r * 2, 0, 6.2832);
+    g.stroke();
+  }
+  for (let k = 0; k < 12; k++) {
+    g.beginPath();
+    g.moveTo(mid + Math.cos((k * Math.PI) / 6) * 30, mid + Math.sin((k * Math.PI) / 6) * 30);
+    g.lineTo(mid + Math.cos((k * Math.PI) / 6) * CITY_R * 2, mid + Math.sin((k * Math.PI) / 6) * CITY_R * 2);
+    g.stroke();
+  }
+  g.fillStyle = "#f4dc90";
+  g.beginPath();
+  g.arc(mid, mid, 32, 0, 6.2832);
+  g.fill();
+  for (const park of PARKS) {
+    g.fillStyle = "#6cc860";
+    g.beginPath();
+    g.arc(park.at.x * 2, park.at.y * 2, park.r * 2, 0, 6.2832);
+    g.fill();
+    g.strokeStyle = "#2f8a3c";
+    g.lineWidth = 2;
+    g.stroke();
+    if (park.pond) {
+      g.fillStyle = "#4a90e0";
+      g.beginPath();
+      g.arc(park.at.x * 2, park.at.y * 2, park.r * 0.72, 0, 6.2832);
+      g.fill();
+    }
+  }
+  g.fillStyle = "#3a4a8a";
+  g.beginPath();
+  g.arc(mid, mid, 7, 0, 6.2832);
+  g.fill();
+  g.fillStyle = "#9fe8ff";
+  g.beginPath();
+  g.arc(mid, mid, 3, 0, 6.2832);
+  g.fill();
+  for (const cafe of cafes) {
+    const x = Math.round(cafe.x / 8), y = Math.round(cafe.y / 8) - 4;
+    g.fillStyle = "#ffffff";
+    g.fillRect(x - 4, y - 4, 9, 9);
+    g.fillStyle = "#2f9a4c";
+    g.fillRect(x - 1, y - 3, 3, 7);
+    g.fillRect(x - 3, y - 1, 7, 3);
+  }
+})();
+// Draw the map in a square on the screen: centred on (cx, cy) in city squares, showing "across" squares.
+function drawMap(x, y, size, cx, cy, across, goal) {
+  const k = size / (across * 2);         // how big one map pixel is on the screen
+  const toScreen = (px, py) => [x + size / 2 + (px / 8 - cx * 2) * k, y + size / 2 + (py / 8 - cy * 2) * k];
+  ctx.fillStyle = "#1d1730";
+  ctx.fillRect(x - 3, y - 3, size + 6, size + 6);
+  ctx.fillStyle = "#f4f0e0";
+  ctx.fillRect(x - 2, y - 2, size + 4, size + 4);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, size, size);
+  ctx.clip();
+  ctx.fillStyle = "#2c4a34";
+  ctx.fillRect(x, y, size, size);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(cityMap, x + size / 2 - cx * 2 * k, y + size / 2 - cy * 2 * k, CW * 2 * k, CH * 2 * k);
+  ctx.imageSmoothingEnabled = false;
+  if (isNight()) {                        // tonight's Battle Zone, in red
+    const zone = zoneNow(), [mx, my] = toScreen(MID * TILE, MID * TILE), from = (zone.from * Math.PI) / 180, to = (zone.to * Math.PI) / 180;
+    ctx.fillStyle = "rgba(255,60,90,0.32)";
+    ctx.strokeStyle = "#ff3c5a";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(mx, my, 89.5 * 2 * k, from, to);
+    ctx.arc(mx, my, 23.5 * 2 * k, to, from, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ff3c5a";
+    for (const t of trainers) if (!t.beaten) {
+      const [tx, ty] = toScreen(t.x, t.y);
+      ctx.fillRect(Math.round(tx) - 1, Math.round(ty) - 1, 3, 3);
+    }
+  }
+  for (const portal of RAIDS) if (portal.open) {
+    const [px, py] = toScreen(portal.x, portal.y);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(Math.round(px) - 3, Math.round(py) - 3, 7, 7);
+    ctx.fillStyle = "#a050f0";
+    ctx.fillRect(Math.round(px) - 2, Math.round(py) - 2, 5, 5);
+  }
+  if (goal) {                             // where to go next: a flashing yellow diamond (kept on the edge if it is off the map)
+    let [gx, gy] = toScreen(goal.x, goal.y);
+    gx = Math.max(x + 5, Math.min(x + size - 5, gx));
+    gy = Math.max(y + 5, Math.min(y + size - 5, gy));
+    ctx.fillStyle = "#1d1730";
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - 6);
+    ctx.lineTo(gx + 6, gy);
+    ctx.lineTo(gx, gy + 6);
+    ctx.lineTo(gx - 6, gy);
+    ctx.fill();
+    ctx.fillStyle = Math.floor(time * 4) % 2 ? "#fff27a" : "#ffb020";
+    ctx.beginPath();
+    ctx.moveTo(gx, gy - 4);
+    ctx.lineTo(gx + 4, gy);
+    ctx.lineTo(gx, gy + 4);
+    ctx.lineTo(gx - 4, gy);
+    ctx.fill();
+  }
+  const [px, py] = toScreen(me.x, me.y);   // you: an arrow pointing the way you are facing
+  ctx.translate(px, py);
+  ctx.rotate(Math.atan2(Math.sin(me.face), -Math.cos(me.face)));
+  ctx.fillStyle = "#1d1730";
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(6, 6);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(-6, 6);
+  ctx.fill();
+  ctx.fillStyle = "#ff5a3a";
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(4, 4);
+  ctx.lineTo(0, 2);
+  ctx.lineTo(-4, 4);
+  ctx.fill();
+  ctx.restore();
+}
 
 // ----- What the game remembers -----
 const SAVE_NAME = "neonCitySave";
@@ -220,7 +371,7 @@ let cam = { x: 0, y: 0 };
 let time = 0;
 let clock = 0.08;            // 0 to 0.6 is day, 0.6 to 1 is night
 let nights = 0;
-let mode = "title";          // title, outfit, choose, play, team, dex
+let mode = "title";          // title, outfit, choose, play, team, dex, map
 let pick = 0;
 const isNight = () => clock >= 0.6;
 const zoneNow = () => BATTLE_ZONES[nights % BATTLE_ZONES.length];
@@ -585,6 +736,7 @@ function updatePlay(dt) {
   if (pressed("KeyX")) return ((mode = "team"), (pick = 0));
   if (pressed("KeyZ")) return (mode = "dex");
   if (pressed("KeyO") && !fight) return ((mode = "outfit"), (pick = 0));
+  if (pressed("KeyM")) return (mode = "map");
   // The clock: day turns to night, and the Battle Zone opens
   const wasNight = isNight();
   if (!fight) clock += dt / 420;
@@ -929,31 +1081,14 @@ function drawPlay() {
   // An arrow in the corner points the way to where you should go next
   const zone = zoneNow(), zoneMid = polar((zone.from + zone.to) / 2, 50);
   const nearestPark = PARKS.slice().sort((a, b) => Math.hypot(a.at.x * TILE - me.x, a.at.y * TILE - me.y) - Math.hypot(b.at.x * TILE - me.x, b.at.y * TILE - me.y))[0];
-  const goal = fight ? null : state.rank < RANKS.length - 1 && state.points >= POINTS_NEEDED ? { x: OFFICIAL.x, y: OFFICIAL.y, name: "Tower" }
+  const goal = fight || raid ? null : state.rank < RANKS.length - 1 && state.points >= POINTS_NEEDED ? { x: OFFICIAL.x, y: OFFICIAL.y, name: "Tower" }
     : isNight() ? (inZone(zone, Math.floor(me.x / TILE), Math.floor(me.y / TILE)) ? null : { x: zoneMid.x * TILE, y: zoneMid.y * TILE, name: "Battle Zone" })
     : { x: nearestPark.at.x * TILE, y: nearestPark.at.y * TILE, name: nearestPark.name };
-  if (goal && Math.hypot(goal.x - me.x, goal.y - me.y) > 120) {
-    ctx.save();
-    ctx.translate(446, 74);
-    ctx.rotate(-(Math.atan2(goal.x - me.x, goal.y - me.y) - look + Math.PI));
-    ctx.fillStyle = "#1d1730";
-    ctx.beginPath();
-    ctx.moveTo(0, -15);
-    ctx.lineTo(11, 11);
-    ctx.lineTo(0, 5);
-    ctx.lineTo(-11, 11);
-    ctx.fill();
-    ctx.fillStyle = "#fff27a";
-    ctx.beginPath();
-    ctx.moveTo(0, -12);
-    ctx.lineTo(8, 8);
-    ctx.lineTo(0, 3);
-    ctx.lineTo(-8, 8);
-    ctx.fill();
-    ctx.restore();
-    words(goal.name, 446, 94, "#fff27a", 6, "center");
-    words(Math.round(Math.hypot(goal.x - me.x, goal.y - me.y) / TILE) + " steps", 446, 104, "#ffffff", 5, "center");
-  }
+  // The mini-map in the corner: the streets around you, with north at the top
+  drawMap(382, 8, 90, me.x / TILE, me.y / TILE, 46, goal);
+  words("N", 427, 10, "#1d1730", 6, "center");
+  if (goal) words(goal.name + " " + Math.round(Math.hypot(goal.x - me.x, goal.y - me.y) / TILE), 427, 104, "#fff27a", 6, "center");
+  words("M: big map", 427, goal ? 114 : 104, "#ffffff", 5, "center");
   for (const f of floats) {
     ctx.globalAlpha = Math.min(1, f.life * 2.5);
     over(f.x, f.y + 30, 26 + (0.9 - f.life) * 24, f.text, f.colour, 7);
@@ -995,6 +1130,30 @@ function drawPlay() {
     hpBar(aim.c, 198, 25, 124);
     if (aim.wild) words("E: throw orb (" + state.orbs + ")", 240, 44, "#fff27a", 6, "center");
   }
+}
+
+// The big map (M): the whole city on one screen
+function drawBigMap() {
+  ctx.fillStyle = "#24304e";
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  words("BRIGHTWATER CITY", 96, 12, "#fff27a", 8, "center");
+  drawMap(184, 12, 288, MID, MID, CW, null);
+  const key = function (y, colour, text) {
+    ctx.fillStyle = colour;
+    ctx.fillRect(12, y, 8, 8);
+    words(text, 26, y, "#ffffff", 6);
+  };
+  key(36, "#ff5a3a", "You");
+  key(50, "#6cc860", "Wild zones");
+  key(64, "#2f9a4c", "Cafes (heal)");
+  key(78, "#a050f0", "Raid portals");
+  key(92, "#9fe8ff", "The tower");
+  key(106, "#ff3c5a", "Battle Zone");
+  words("(at night)", 26, 116, "#bfe8ff", 5);
+  PARKS.forEach((park, n) => words(park.name + " L" + park.lv[0] + "-" + park.lv[1], 12, 140 + n * 12, "#9af0a0", 5));
+  words("Rank " + RANKS[state.rank] + "  " + state.points + "/" + POINTS_NEEDED, 12, 226, "#fff27a", 6);
+  words(isNight() ? "It is night." : "It is day.", 12, 240, "#ffffff", 6);
+  words("M: close", 12, 296, "#ffffff", 6);
 }
 
 // The outfit designer: the 3D camera zooms in on you, and this draws the list of choices
@@ -1066,6 +1225,7 @@ function update(dt) {
     }
     if (wentBack()) mode = "play";
   } else if (mode === "dex" && (pressed("KeyZ") || wentBack() || chose())) mode = "play";
+  else if (mode === "map" && (pressed("KeyM") || wentBack() || chose())) mode = "play";
 }
 function draw() {
   if (mode === "play" || mode === "outfit" || mode === "title") VIEW.render();
@@ -1073,6 +1233,7 @@ function draw() {
   else if (mode === "dex") drawDex();
   else if (mode === "choose") drawChoose();
   else if (mode === "outfit") drawOutfit();
+  else if (mode === "map") drawBigMap();
   else if (mode === "title") ctx.clearRect(0, 0, VIEW_W, VIEW_H);
   else drawPlay();
   if (mode !== "play" && !el("prompt").hidden) el("prompt").hidden = true;

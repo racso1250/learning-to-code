@@ -332,7 +332,7 @@ const VIEW = (function () {
     }
   }
   const STOREY = 13;           // how tall each floor is
-  const TINTS = [[1, 1, 1], [0.96, 0.92, 0.86], [1, 0.95, 0.92], [0.93, 0.95, 0.99]];
+  const TINTS = [[1, 1, 1], [0.97, 0.95, 0.91]];
   // The four walls of a box, with a picture repeated along them (once per square wide, "up" times high)
   function wallsOf(name, x0, x1, z0, z1, y0, y1, up, tint, inset, lean) {
     const a = inset || 0;
@@ -346,52 +346,35 @@ const VIEW = (function () {
     side([x0, 0, z0], [x0, 0, z1], [-1, 0, 0], (z1 - z0) / TILE);
   }
   function build() {
-    // Pictures for the ground
-    const speckle = (g, colours, count, w, h) => {
-      for (let i = 0; i < count; i++) {
-        g.fillStyle = colours[i % colours.length];
-        g.fillRect(Math.floor(Math.random() * 64), Math.floor(Math.random() * 64), w, h);
-      }
-    };
-    const groundPaint = (draw) => new THREE.MeshLambertMaterial({ map: picture2(64, 64, draw, true), vertexColors: true });
-    walls.street = groundPaint(function (g) {              // grey cobbles
-      g.fillStyle = "#8f8f96";
+    // Paints for the ground: smooth and plain, so the city looks neat
+    const groundPaint = (colour, draw) => new THREE.MeshLambertMaterial({ map: picture2(64, 64, function (g) {
+      g.fillStyle = colour;
       g.fillRect(0, 0, 64, 64);
-      for (let row = 0; row < 8; row++) for (let col = 0; col < 8; col++) {
-        g.fillStyle = ["#9a9aa2", "#a4a4aa", "#94949c", "#aaa8a8"][(row * 3 + col * 5 + (row % 2)) % 4];
-        g.fillRect(col * 8 + (row % 2 ? 4 : 0) - 4, row * 8, 7, 7);
-        g.fillRect(col * 8 + (row % 2 ? 4 : 0) + 60, row * 8, 7, 7);
-      }
+      if (draw) draw(g);
+    }, true), vertexColors: true });
+    walls.road = groundPaint("#6e727c");
+    walls.kerb = groundPaint("#d2cdbf");
+    walls.pave = groundPaint("#b4ac9c", function (g) {      // big clean paving slabs
+      g.fillStyle = "#a8a090";
+      g.fillRect(0, 31, 64, 1);
+      g.fillRect(0, 63, 64, 1);
+      g.fillRect(31, 0, 1, 32);
+      g.fillRect(63, 32, 1, 32);
     });
-    walls.plaza = groundPaint(function (g) {               // pale stone slabs
-      g.fillStyle = "#a89c84";
-      g.fillRect(0, 0, 64, 64);
-      for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
-        g.fillStyle = (row + col) % 2 ? "#c4b89e" : "#b8ac92";
-        g.fillRect(col * 32 + 1, row * 32 + 1, 30, 30);
-      }
+    walls.plaza = groundPaint("#e2d4b4", function (g) {
+      g.fillStyle = "#d4c4a0";
+      g.fillRect(0, 0, 32, 32);
+      g.fillRect(32, 32, 32, 32);
     });
-    walls.grass = groundPaint(function (g) {
-      g.fillStyle = "#62b852";
-      g.fillRect(0, 0, 64, 64);
-      speckle(g, ["#56ac48", "#70c85e", "#4ea242"], 260, 2, 3);
-    });
-    walls.tall = groundPaint(function (g) {
-      g.fillStyle = "#4a9e42";
-      g.fillRect(0, 0, 64, 64);
-      speckle(g, ["#2f8236", "#3c9440", "#63b854", "#2a7430"], 420, 2, 7);
-    });
-    walls.yard = groundPaint(function (g) {
-      g.fillStyle = "#c8b898";
-      g.fillRect(0, 0, 64, 64);
-      speckle(g, ["#bcaa88", "#d4c6a8", "#b4a280"], 300, 2, 2);
-    });
-    walls.out = groundPaint(function (g) {
-      g.fillStyle = "#4f9a48";
-      g.fillRect(0, 0, 64, 64);
-      speckle(g, ["#458c40", "#5aa650"], 200, 3, 3);
-    });
+    walls.grass = groundPaint("#66bc56");
+    walls.tall = groundPaint("#4fa648");
     walls.water = new THREE.MeshPhongMaterial({ color: 0x3a8ad8, shininess: 120, specular: 0xffffff, vertexColors: true });
+    walls.pond = walls.water.clone();
+    // All the ground lies flat at one height. Each layer is told to draw "in front of" the ones before it,
+    // so roads sit on pavement, parks sit on roads, and ponds sit on parks, with no flickering.
+    ["pave", "water", "kerb", "road", "plaza", "grass", "tall", "pond"].forEach(function (name, layer) {
+      Object.assign(walls[name], { polygonOffset: true, polygonOffsetFactor: -layer, polygonOffsetUnits: -layer * 4 });
+    });
     // Pictures for the buildings: cream stone with tall windows, shutters and little iron balconies
     const wallPaint = function (lit) {
       const draw = (night) => function (g) {
@@ -480,30 +463,63 @@ const VIEW = (function () {
     walls.zinc = new THREE.MeshLambertMaterial({ color: 0x8a96a4, vertexColors: true });
     walls.stone = new THREE.MeshLambertMaterial({ color: 0xcfc6b2, vertexColors: true });
 
-    // The ground, one strip of same-kind squares at a time
-    const groundName = ["street", "plaza", "grass", "tall", "yard", "water", "street", "grass", "out"];
-    for (let ty = 0; ty < CH; ty++) {
-      let from = 0;
-      for (let tx = 1; tx <= CW; tx++) {
-        if (tx < CW && tiles[ty][tx] === tiles[ty][from] && tx % PIECE !== 0) continue;
-        const kind = tiles[ty][from], x0 = from * TILE, x1 = tx * TILE, z0 = ty * TILE, z1 = z0 + TILE, y = kind === POND ? -1.4 : 0;
-        if (kind !== OUT || fromMid(from, ty) < CITY_R + 14) quad(groundName[kind], [x0, y, z1], [x1, y, z1], [x1, y, z0], [x0, y, z0], [0, 1, 0], [[x0 / 32, z1 / 32], [x1 / 32, z1 / 32], [x1 / 32, z0 / 32], [x0 / 32, z0 / 32]]);
-        from = tx;
+    // The ground is laid in smooth layers, each a little higher than the last:
+    // pavement, the river, roads with pale kerbs, the plaza, then the parks and their ponds.
+    const mid = MID * TILE, up = [0, 1, 0];
+    const flat = (name, y, a, b, c, d) => quad(name, [a[0], 0.05, a[1]], [b[0], 0.05, b[1]], [c[0], 0.05, c[1]], [d[0], 0.05, d[1]], up, [a, b, c, d].map(([x, z]) => [x / 32, z / 32]));
+    const around = (r, turn) => [mid + Math.cos(turn) * r, mid + Math.sin(turn) * r];
+    // A ring (or a filled circle, when "inner" is 0) made of thin wedges
+    const ring = function (name, y, inner, outer, cx, cz) {
+      for (let n = 0; n < 144; n++) {
+        const a0 = (n / 144) * Math.PI * 2, a1 = ((n + 1) / 144) * Math.PI * 2;
+        const at = (r, turn) => [(cx == null ? mid : cx) + Math.cos(turn) * r, (cz == null ? mid : cz) + Math.sin(turn) * r];
+        flat(name, y, at(inner, a0), at(outer, a0), at(outer, a1), at(inner, a1));
+      }
+    };
+    for (let r = 0; r < CITY_R * TILE + 12; r += 256) ring("pave", -1.6, r, Math.min(r + 256, CITY_R * TILE + 12));
+    for (let tx = 0; tx < CW; tx++) {          // the river: a smooth winding ribbon
+      const z0 = (MID - 36 + Math.sin(tx / 14) * 5) * TILE, z1 = (MID - 36 + Math.sin((tx + 1) / 14) * 5) * TILE, x0 = tx * TILE, x1 = x0 + TILE;
+      if (Math.hypot(x0 - mid, z0 - mid) > CITY_R * TILE) continue;
+      flat("water", -1.3, [x0, z0 + 40], [x1, z1 + 40], [x1, z1 - 40], [x0, z0 - 40]);
+    }
+    const HALF = 19;                            // half the width of a road
+    for (const r of RINGS) {
+      ring("kerb", -1.0, r * TILE - HALF - 3, r * TILE + HALF + 3);
+      ring("road", -0.8, r * TILE - HALF, r * TILE + HALF);
+    }
+    for (let k = 0; k < 12; k++) {             // the avenues, cut into short lengths so they light and fog properly
+      const turn = (k * Math.PI) / 6, sx = -Math.sin(turn), sz = Math.cos(turn);
+      for (let r = 15 * TILE; r < CITY_R * TILE; r += 128) {
+        const [ax, az] = around(r, turn), [bx, bz] = around(Math.min(r + 128, CITY_R * TILE), turn);
+        const strip = (name, y, wide) => flat(name, y, [ax + sx * wide, az + sz * wide], [bx + sx * wide, bz + sz * wide], [bx - sx * wide, bz - sz * wide], [ax - sx * wide, az - sz * wide]);
+        strip("kerb", -0.9, HALF + 3);
+        strip("road", -0.7, HALF);
+      }
+    }
+    ring("kerb", -0.6, 0, 16 * TILE + 3);
+    ring("plaza", -0.5, 0, 16 * TILE);
+    for (const park of PARKS) {
+      const px = park.at.x * TILE, pz = park.at.y * TILE;
+      ring("kerb", -0.4, 0, park.r * TILE + 3, px, pz);
+      ring("grass", -0.3, 0, park.r * TILE, px, pz);
+      for (let n = 0; n < 7; n++) {             // patches of longer grass
+        const turn = n * 0.9 + park.r, far = park.r * TILE * (0.3 + hash(n, park.r, 66) * 0.42);
+        ring("tall", -0.2, 0, 26 + hash(park.r, n, 67) * 22, px + Math.cos(turn) * far, pz + Math.sin(turn) * far);
+      }
+      if (park.pond) {
+        ring("pond", -0.1, 0, park.r * TILE * 0.36, px, pz);
       }
     }
     // The buildings: a row of shops, floors of windows, then a sloping slate roof
     for (const b of buildings) {
-      const x0 = b.x * TILE, x1 = (b.x + b.w) * TILE, z0 = b.y * TILE, z1 = (b.y + b.h) * TILE, high = 15 + b.floors * STOREY;
+      // (drawn a little smaller than the ground it stands on, which leaves a clean strip of pavement all round)
+      const x0 = b.x * TILE + 5, x1 = (b.x + b.w) * TILE - 5, z0 = b.y * TILE + 5, z1 = (b.y + b.h) * TILE - 5, high = 15 + b.floors * STOREY;
       wallsOf(b.cafe ? "cafe" : "shop" + b.shop, x0, x1, z0, z1, 0, 15, 1, null);
       wallsOf(b.lit ? "lit" : "unlit", x0, x1, z0, z1, 15, high, b.floors, TINTS[b.tint]);
       wallsOf("stone", x0 - 0.8, x1 + 0.8, z0 - 0.8, z1 + 0.8, high, high + 1.6, 1, null);          // a ledge under the roof
       quad("stone", [x0 - 0.8, high + 1.6, z1 + 0.8], [x1 + 0.8, high + 1.6, z1 + 0.8], [x1 + 0.8, high + 1.6, z0 - 0.8], [x0 - 0.8, high + 1.6, z0 - 0.8], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
       wallsOf("slate", x0, x1, z0, z1, high + 1.6, high + 14, 1, null, 5, true);
       quad("zinc", [x0 + 5, high + 14, z1 - 5], [x1 - 5, high + 14, z1 - 5], [x1 - 5, high + 14, z0 + 5], [x0 + 5, high + 14, z0 + 5], [0, 1, 0], [[0, 0], [1, 0], [1, 1], [0, 1]]);
-      for (let n = 0; n < 2; n++) {             // chimneys
-        const cx = x0 + 10 + hash(b.x, b.y, 70 + n) * (x1 - x0 - 20), cz = z0 + 10 + hash(b.x, b.y, 80 + n) * (z1 - z0 - 20);
-        wallsOf("stone", cx - 2.5, cx + 2.5, cz - 2, cz + 2, high + 14, high + 21, 1, [0.82, 0.6, 0.5]);
-      }
     }
     // The city wall round the outside
     for (let n = 0; n < 96; n++) {
@@ -518,7 +534,7 @@ const VIEW = (function () {
       shape.setAttribute("uv", new THREE.Float32BufferAttribute(lump.uv, 2));
       shape.setAttribute("color", new THREE.Float32BufferAttribute(lump.color, 3));
       const mesh = new THREE.Mesh(shape, walls[lump.name]);
-      const flatGround = ["street", "plaza", "grass", "tall", "yard", "water", "out"].includes(lump.name);
+      const flatGround = ["road", "kerb", "pave", "plaza", "grass", "tall", "water", "pond"].includes(lump.name);
       mesh.castShadow = !flatGround;
       mesh.receiveShadow = true;
       scene.add(mesh);
@@ -580,9 +596,9 @@ const VIEW = (function () {
     // Cafe signs: a glowing green cross above the door
     for (const cafe of cafes) {
       const signPaint = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x3aa858, emissiveIntensity: 0.5 });
-      box(12, 12, 1.5, signPaint, cafe.x, 24, cafe.y - 8.4);
-      box(8, 2.8, 2.2, 0x3aa858, cafe.x, 24, cafe.y - 8.4);
-      box(2.8, 8, 2.2, 0x3aa858, cafe.x, 24, cafe.y - 8.4);
+      box(12, 12, 1.5, signPaint, cafe.x, 24, cafe.y - 13.4);
+      box(8, 2.8, 2.2, 0x3aa858, cafe.x, 24, cafe.y - 13.4);
+      box(2.8, 8, 2.2, 0x3aa858, cafe.x, 24, cafe.y - 13.4);
       glow(0x7af0a0, 60, cafe.x, 22, cafe.y - 4);
     }
     // Wild zones have a shimmering green fence of light round them
@@ -598,16 +614,16 @@ const VIEW = (function () {
     scene.add(tower);
     const tier = (r1, r2, h, y, colour) => add(new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, 8), paintOf(colour)), 0, y + h / 2, 0, tower);
     const ringPaint = new THREE.MeshBasicMaterial({ color: 0x9fe8ff });
-    const ring = (r, y) => add(new THREE.Mesh(new THREE.TorusGeometry(r, 1.6, 6, 24), ringPaint), 0, y, 0, tower).rotation.set(Math.PI / 2, 0, 0);
+    const hoop = (r, y) => add(new THREE.Mesh(new THREE.TorusGeometry(r, 1.6, 6, 24), ringPaint), 0, y, 0, tower).rotation.set(Math.PI / 2, 0, 0);
     tier(24, 31, 70, 0, 0xe4dcc8);
     tier(27, 27, 5, 70, 0x5f7186);
     tier(17, 22, 130, 75, 0xdcd4c0);
     tier(21, 21, 5, 205, 0x5f7186);
     tier(9, 15, 100, 210, 0xd4ccb8);
     add(new THREE.Mesh(new THREE.ConeGeometry(9, 60, 8), paint(0x5f7186)), 0, 340, 0, tower);
-    ring(29, 74);
-    ring(23, 209);
-    ring(12, 312);
+    hoop(29, 74);
+    hoop(23, 209);
+    hoop(12, 312);
     ball(7, new THREE.MeshBasicMaterial({ color: 0xe8fbff }), 0, 374, 0, tower).castShadow = false;
     beacon = glow(0x9fe8ff, 300, 0, 374, 0, tower);
   }
