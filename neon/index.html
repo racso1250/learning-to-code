@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wildlings: Neon City</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="../dragon/style.css?v=3">
+    <style>
+      #view3d { display: block; width: 100%; aspect-ratio: 3 / 2; }
+      #game { position: absolute; inset: 0; width: 100%; height: 100%; }
+      body { background: radial-gradient(ellipse at top, #2a2440, #0c0a16 70%); }
+      h1 { background: linear-gradient(90deg, #ffd84a, #fff6c0, #ffd84a); -webkit-background-clip: text; background-clip: text; }
+      #hearts { color: #ff4a5a; font-size: 13px; height: auto; }
+      #rings span { display: inline-block; padding: 3px 6px; margin-left: 4px; border: 2px solid rgba(255, 255, 255, 0.25); border-radius: 6px; font-size: 8px; }
+      #rings span.picked { border-color: #ffd84a; box-shadow: 0 0 8px #ffd84a; }
+      .mana { display: inline-block; width: 80px; height: 8px; border-radius: 4px; background: #1c1830; overflow: hidden; vertical-align: middle; }
+      #mana-fill { height: 100%; background: linear-gradient(90deg, #6fc0f5, #c8a0ff); }
+    </style>
+  </head>
+  <body>
+    <h1>Wildlings: Neon City</h1>
+    <div class="hud">
+      <span id="hearts"></span>
+      <span id="rings"></span>
+    </div>
+    <p id="place">A real-time creature battler</p>
+    <div class="screen">
+      <canvas id="view3d"></canvas>
+      <canvas id="game"></canvas>
+      <div class="vignette"></div>
+      <div id="hurt"></div>
+      <div id="boss-bar" hidden><span></span><div class="bar"><div id="boss-fill"></div></div></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+      <div id="intro" class="overlay">
+        <p class="small-title">Wildlings</p>
+        <h2 class="logo">Neon City</h2>
+        <p>One big 3D city, full of Wildlings. Design your own outfit, then explore. By day, catch wild ones in the parks. By night, trainers battle in the glowing Battle Zone. Beat the giant raid Wildlings in the purple portals to win rare ones. Fight in real time, dodge their attacks, and climb the Night League from Rank Z all the way to Rank A.</p>
+        <p class="keys">W, A, S, D: walk (your Wildling follows, so move to dodge!) &nbsp; Shift: run<br>Mouse (click the game first) or left and right arrows: look around &nbsp; Mouse wheel: zoom<br>1, 2, 3: attacks &nbsp; E: throw a capture orb &nbsp; F: Starburst (your Wildling changes into its Star form) &nbsp; Q: swap Wildling<br>Space: talk and heal &nbsp; N: wait for night or morning &nbsp; O: change your outfit &nbsp; X: team &nbsp; Z: Wilddex</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Red marks on the ground show where an attack will land: walk away and your Wildling follows you out of danger. Cafes (green cross) heal your team.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+    <script src="../sounds.js"></script>
+    <script src="../dragon/mapkit.js?v=3"></script>
+    <script src="../dragon/pixels.js?v=3"></script>
+    <script src="../dragon/ground.js?v=3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="creatures.js?v=2"></script>
+    <script src="view3d.js?v=2"></script>
+    <script src="game.js?v=3"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
