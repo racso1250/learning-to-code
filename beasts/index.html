@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Beastlings</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <style>
+      /* Beastlings: the page looks like a see-through purple handheld console with a colour screen */
+      body { margin: 0; padding: 10px 12px; min-height: 100vh; text-align: center; font-family: "Press Start 2P", monospace; color: #e8e8e0; background: #2a2c36; }
+      h1 { margin: 0 0 8px; font-size: 18px; color: #f8d030; text-shadow: 3px 3px 0 #e03838; }
+      a { color: #f8d030; font-size: 10px; }
+      .console { max-width: min(1040px, 98vh); margin: 0 auto; padding: 16px 18px 12px; border-radius: 14px 14px 46px 14px; background: #7a58c8; box-shadow: inset -6px -8px 0 #5a3aa0, inset 6px 6px 0 #9a7ae0, 0 10px 30px rgba(0, 0, 0, 0.5); }
+      .bezel { padding: 12px 16px 16px; border-radius: 10px 10px 34px 10px; background: #2a2a38; }
+      .screen { position: relative; border: 4px solid #1a1a22; background: #f8f8f0; }
+      #game { display: block; width: 100%; image-rendering: pixelated; }
+      .label { margin: 10px 0 0; font-size: 9px; color: #f8f8f0; text-align: left; font-style: italic; }
+      .label b { color: #e03838; } .label i { color: #f8d030; } .label u { color: #38c048; text-decoration: none; } .label s { color: #58a8f8; text-decoration: none; }
+      .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px 7%; background: linear-gradient(#b0e0ff, #f8f8f0 55%, #90d860 56%); color: #20203a; font-size: 10px; line-height: 1.8; }
+      .overlay[hidden] { display: none; }
+      .overlay p { margin: 0; }
+      .logo { margin: 0; font-size: clamp(22px, 6vw, 42px); color: #f8d030; -webkit-text-stroke: 2px #20203a; text-shadow: 4px 4px 0 #4868c8; }
+      .small { font-size: 8px; }
+      button { font-family: inherit; font-size: 11px; padding: 9px 14px; border: 3px solid #20203a; background: #f8f8f0; color: #20203a; cursor: pointer; }
+      button:hover { background: #4868c8; color: #f8f8f0; }
+      .help { max-width: 1000px; margin: 14px auto; font-size: 9px; line-height: 1.9; }
+    </style>
+  </head>
+  <body>
+    <h1>Beastlings</h1>
+    <div class="console">
+      <div class="bezel">
+        <div class="screen">
+          <canvas id="game" width="160" height="144"></canvas>
+          <div id="intro" class="overlay">
+            <p class="small">a pocket-sized adventure</p>
+            <h2 class="logo">BEASTLINGS</h2>
+            <p>Design your character, explore the Kova region, catch all 68 Beastlings, win five gym badges and beat the Champion.</p>
+            <button id="continue" hidden>Continue</button>
+            <button id="start">New game</button>
+          </div>
+        </div>
+      </div>
+      <p class="label">POCKET BEAST <b>C</b><i>O</i><u>L</u><s>O</s><b>R</b></p>
+    </div>
+    <p class="help">Arrows or WASD: walk &nbsp; Z or Space: A button (talk, choose) &nbsp; X: B button (back, hold to run) &nbsp; Enter: menu (save, team, Dex, and LOOK to change your character)</p>
+    <p class="help">Wild Beastlings hide in tall grass. Weaken one, then throw a Snare Orb. Walk into a door to go inside, talk to the person there with Z, and leave by the red doormat. A + building heals your team; a $ building is a shop.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=2"></script>
+    <script src="world.js?v=3"></script>
+    <script src="game.js?v=3"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
