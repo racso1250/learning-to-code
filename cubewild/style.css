@@ -278,3 +278,13 @@ button:disabled {
   line-height: 1.8;
   color: #a8c8dc;
 }
+
+/* A blue wash over the screen when your head is under water */
+#under {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+  background: radial-gradient(ellipse at center, rgba(40, 120, 200, 0.25), rgba(10, 50, 120, 0.6));
+}

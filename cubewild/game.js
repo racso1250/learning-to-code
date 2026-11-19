@@ -5,7 +5,7 @@
 const el = (id) => document.getElementById(id);
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
 const canvas = el("game");
-const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: false });
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
 renderer.setPixelRatio(1);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, 1.5, 0.1, 700);
@@ -14,12 +14,21 @@ const VIEW = 5;                     // how many chunks you can see in each direc
 const DAY_SECONDS = 420;            // how long a whole day and night lasts
 const TEST = location.search.includes("test");    // (only for testing the game)
 
+// Your hand, and whatever it is holding, is drawn on top of everything else (with its own little camera)
+const handScene = new THREE.Scene();
+const handCamera = new THREE.PerspectiveCamera(60, 1.5, 0.05, 10);
+const handLight = new THREE.AmbientLight(0xffffff, 0.8);
+const handSun = new THREE.DirectionalLight(0xffffff, 0.5);
+handSun.position.set(-0.4, 1, 0.6);
+handScene.add(handLight, handSun);
 function resize() {
   const w = canvas.clientWidth || 960;
   const h = Math.round(w / 1.5);
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  handCamera.aspect = w / h;
+  handCamera.updateProjectionMatrix();
 }
 window.addEventListener("resize", resize);
 resize();
@@ -49,22 +58,32 @@ const atlasCanvas = makeAtlas();
 const atlas = new THREE.CanvasTexture(atlasCanvas);
 atlas.magFilter = THREE.NearestFilter;
 atlas.minFilter = THREE.NearestFilter;
-const shared = { map: { value: atlas }, day: { value: new THREE.Color(1, 1, 1) }, fogColor: { value: new THREE.Color() }, fogNear: { value: 40 }, fogFar: { value: 80 } };
+const shared = { map: { value: atlas }, day: { value: new THREE.Color(1, 1, 1) }, fogColor: { value: new THREE.Color() }, fogNear: { value: 40 }, fogFar: { value: 80 }, time: { value: 0 } };
 function blockMaterial(alpha) {
   return new THREE.ShaderMaterial({
     uniforms: Object.assign({ alpha: { value: alpha } }, shared),
     vertexShader: `
-      attribute vec3 shade;
+      uniform float time;
+      uniform float alpha;
+      attribute vec3 shade;      // x: how bright this corner is. y: how much it sways in the wind (or bobs, if it is water).
       attribute float glow;
       varying vec2 vUv;
-      varying vec3 vShade;
+      varying float vLight;
       varying float vGlow;
       varying float vFar;
+      varying vec3 vPlace;
       void main() {
         vUv = uv;
-        vShade = shade;
+        vLight = shade.x;
         vGlow = glow;
-        vec4 seen = modelViewMatrix * vec4(position, 1.0);
+        vec3 p = position;
+        if (alpha < 1.0) p.y += (sin(time * 1.7 + p.x * 0.9 + p.z * 0.6) * 0.06 - 0.03) * shade.y;      // little waves on the water
+        else {
+          p.x += sin(time * 1.9 + p.x * 0.8 + p.z * 0.6 + p.y) * 0.07 * shade.y;                        // plants and leaves rustle
+          p.z += cos(time * 1.6 + p.z * 0.9 + p.x * 0.5) * 0.06 * shade.y;
+        }
+        vPlace = p;
+        vec4 seen = modelViewMatrix * vec4(p, 1.0);
         vFar = -seen.z;
         gl_Position = projectionMatrix * seen;
       }`,
@@ -75,15 +94,27 @@ function blockMaterial(alpha) {
       uniform float fogNear;
       uniform float fogFar;
       uniform float alpha;
+      uniform float time;
       varying vec2 vUv;
-      varying vec3 vShade;
+      varying float vLight;
       varying float vGlow;
       varying float vFar;
+      varying vec3 vPlace;
       void main() {
         vec4 picture = texture2D(map, vUv);
         if (picture.a < 0.5) discard;
-        vec3 light = min(vShade * day + vGlow * vec3(1.0, 0.84, 0.58), vec3(1.2));
+        vec3 light = min(vLight * day + vGlow * vec3(1.0, 0.84, 0.58), vec3(1.2));
         vec3 colour = picture.rgb * light;
+        if (alpha < 1.0) {
+          // Water: a little of the sky's colour, and ripples of light that drift across it
+          float ripple = sin(vPlace.x * 2.6 + time * 1.8) * sin(vPlace.z * 2.6 + time * 1.3);
+          colour = mix(colour, fogColor, 0.2) + vec3(0.08) * ripple * day;
+        } else {
+          // A soft shadow round the edge of each face, so every block stands out from its neighbours
+          vec2 cell = fract(vUv * vec2(${ATLAS_COLS}.0, ${ATLAS_ROWS}.0));
+          float edge = min(min(cell.x, 1.0 - cell.x), min(cell.y, 1.0 - cell.y));
+          colour *= 0.88 + 0.12 * smoothstep(0.0, 0.09, edge);
+        }
         gl_FragColor = vec4(mix(colour, fogColor, smoothstep(fogNear, fogFar, vFar)), alpha);
       }`,
     side: THREE.DoubleSide,
@@ -96,6 +127,7 @@ const waterMaterial = blockMaterial(0.72);
 
 // A small picture of each block (for the belt and the backpack), and its average colour (for the bits that fly off)
 const icons = [];
+const iconCanvases = [];
 const colours = [];
 for (let id = 1; id < BLOCKS.length; id++) {
   const tile = BLOCKS[id].tex[1];
@@ -105,6 +137,7 @@ for (let id = 1; id < BLOCKS.length; id++) {
   const g = icon.getContext("2d");
   g.drawImage(atlasCanvas, (tile % ATLAS_COLS) * 16, Math.floor(tile / ATLAS_COLS) * 16, 16, 16, 0, 0, 16, 16);
   icons[id] = icon.toDataURL();
+  iconCanvases[id] = icon;
   const pixels = g.getImageData(0, 0, 16, 16).data;
   let r = 0, gg = 0, b = 0, n = 0;
   for (let i = 0; i < pixels.length; i += 4) {
@@ -168,8 +201,10 @@ function startWorld(saved) {
     [state.x, state.y, state.z] = state.spawn;
   }
   Object.assign(player, { x: state.x, y: state.y, z: state.z, yaw: state.yaw, pitch: state.pitch, vy: 0, fly: false, fallFrom: state.y });
-  for (const creature of creatures) scene.remove(creature.group);
+  for (const creature of creatures) scene.remove(creature.group, creature.shadow);
   creatures.length = 0;
+  for (const shot of shots) scene.remove(shot.mesh);
+  shots.length = 0;
   fuses.length = 0;
   loading = true;
   drawBelt();
@@ -240,6 +275,65 @@ scene.add(skyLight, sunLight);
 const sun = new THREE.Mesh(new THREE.BoxGeometry(34, 34, 1), new THREE.MeshBasicMaterial({ color: 0xfff3a0, fog: false }));
 const moon = new THREE.Mesh(new THREE.BoxGeometry(22, 22, 1), new THREE.MeshBasicMaterial({ color: 0xdfe6f5, fog: false }));
 scene.add(sun, moon);
+// The sky is the inside of a huge ball: pale at the horizon, deeper overhead, with a warm glow round the sun
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(640, 24, 14), new THREE.ShaderMaterial({
+  uniforms: { top: { value: new THREE.Color() }, bottom: { value: new THREE.Color() }, sunWay: { value: new THREE.Vector3(0, 1, 0) }, sunGlow: { value: new THREE.Color() } },
+  vertexShader: `
+    varying vec3 vWay;
+    void main() {
+      vWay = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform vec3 top;
+    uniform vec3 bottom;
+    uniform vec3 sunWay;
+    uniform vec3 sunGlow;
+    varying vec3 vWay;
+    void main() {
+      vec3 way = normalize(vWay);
+      vec3 colour = mix(bottom, top, pow(clamp(way.y * 1.5 + 0.05, 0.0, 1.0), 0.6));
+      float towards = max(0.0, dot(way, sunWay));
+      colour += sunGlow * (pow(towards, 5.0) * 0.45 + pow(towards, 50.0) * 0.5);
+      gl_FragColor = vec4(colour, 1.0);
+    }`,
+  side: THREE.BackSide, depthWrite: false, fog: false,
+}));
+skyDome.renderOrder = -10;
+skyDome.frustumCulled = false;
+scene.add(skyDome);
+// A soft glow round the sun and the moon
+const glowPicture = (function () {
+  const board = document.createElement("canvas");
+  board.width = board.height = 64;
+  const g2 = board.getContext("2d"), fade = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+  fade.addColorStop(0, "rgba(255,255,255,1)");
+  fade.addColorStop(0.35, "rgba(255,255,255,0.3)");
+  fade.addColorStop(1, "rgba(255,255,255,0)");
+  g2.fillStyle = fade;
+  g2.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(board);
+})();
+const haloOf = function (colour, size) {
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowPicture, color: colour, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false }));
+  halo.scale.set(size, size, 1);
+  scene.add(halo);
+  return halo;
+};
+const sunHalo = haloOf(0xffe9a0, 190), moonHalo = haloOf(0xa8c0ff, 90);
+// The moon has a few grey craters
+moon.material.map = (function () {
+  const board = document.createElement("canvas");
+  board.width = board.height = 8;
+  const g2 = board.getContext("2d");
+  g2.fillStyle = "#ffffff";
+  g2.fillRect(0, 0, 8, 8);
+  g2.fillStyle = "#c2cadc";
+  for (const [x, y, w, h] of [[1, 1, 2, 2], [5, 2, 2, 1], [3, 5, 1, 1], [5, 5, 2, 2], [1, 6, 1, 1]]) g2.fillRect(x, y, w, h);
+  const picture = new THREE.CanvasTexture(board);
+  picture.magFilter = THREE.NearestFilter;
+  return picture;
+})();
 const starSpots = [];
 for (let i = 0; i < 500; i++) {
   const a = Math.random() * Math.PI * 2;
@@ -254,9 +348,16 @@ stars.frustumCulled = false;
 scene.add(stars);
 const cloudMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, fog: false });
 const clouds = [];
-for (let i = 0; i < 20; i++) {
-  const cloud = new THREE.Mesh(new THREE.BoxGeometry(18 + Math.random() * 30, 3 + Math.random() * 2, 12 + Math.random() * 20), cloudMaterial);
-  cloud.userData = { x: Math.random() * 480 - 240, z: Math.random() * 480 - 240, y: 74 + Math.random() * 10 };
+for (let i = 0; i < 26; i++) {
+  // Each cloud is a few flat boxes that overlap, so it looks puffy
+  const cloud = new THREE.Group();
+  const wide = 16 + Math.random() * 22, deep = 10 + Math.random() * 16;
+  for (let k = 0; k < 4; k++) {
+    const puff = new THREE.Mesh(new THREE.BoxGeometry(wide * (0.5 + Math.random() * 0.5), 2.5 + Math.random() * 2.5, deep * (0.5 + Math.random() * 0.5)), cloudMaterial);
+    puff.position.set((Math.random() - 0.5) * wide * 0.8, k * 1.2, (Math.random() - 0.5) * deep * 0.8);
+    cloud.add(puff);
+  }
+  cloud.userData = { x: Math.random() * 480 - 240, z: Math.random() * 480 - 240, y: 72 + Math.random() * 16 };
   clouds.push(cloud);
   scene.add(cloud);
 }
@@ -287,6 +388,16 @@ function updateSky(dt) {
   scene.fog.near = near;
   scene.fog.far = far;
   renderer.setClearColor(sky);
+  // The sky ball: the horizon is the colour of the mist, and it gets deeper overhead
+  skyDome.position.copy(camera.position);
+  skyDome.material.uniforms.bottom.value.copy(sky);
+  skyDome.material.uniforms.top.value.setRGB(sky.r * (under ? 1 : 0.42), sky.g * (under ? 1 : 0.6), under ? sky.b : Math.min(1, sky.b * 0.96 + 0.03));
+  skyDome.material.uniforms.sunWay.value.set(Math.cos(angle) * 560, sunHeight * 560, 130).normalize();
+  skyDome.material.uniforms.sunGlow.value.setRGB(1, 0.72, 0.36).multiplyScalar(under ? 0 : light * 0.35 + blush * 0.75);
+  el("under").style.opacity = under ? 1 : 0;
+  shared.time.value = state.clock;
+  handLight.intensity = 0.4 + 0.45 * light;
+  handSun.intensity = 0.15 + 0.45 * light;
   skyLight.intensity = 0.3 + 0.5 * light;
   sunLight.intensity = 0.5 * light;
   sunLight.position.set(Math.cos(angle), Math.max(0.2, sunHeight), 0.3);
@@ -294,6 +405,10 @@ function updateSky(dt) {
   moon.position.set(camera.position.x - Math.cos(angle) * 560, camera.position.y - sunHeight * 560, camera.position.z - 130);
   sun.lookAt(camera.position);
   moon.lookAt(camera.position);
+  sunHalo.position.copy(sun.position);
+  moonHalo.position.copy(moon.position);
+  sunHalo.material.opacity = 0.75 + blush * 0.25;
+  moonHalo.material.opacity = 0.7 * (1 - light);
   sun.material.color.setRGB(1, 0.95 - 0.3 * blush, 0.63 - 0.4 * blush);
   stars.position.copy(camera.position);
   stars.material.opacity = 1 - light;
@@ -338,7 +453,7 @@ canvas.addEventListener("mousedown", function (event) {
   if (!playing) return;
   if (event.button === 0) {
     mouse.left = true;
-    whack();
+    attack();
   }
   if (event.button === 2) {
     mouse.right = true;
@@ -413,7 +528,8 @@ function movePlayer(dt) {
   const length = Math.hypot(wx, wz) || 1;
   const feet = getBlock(Math.floor(player.x), Math.floor(player.y + 0.2), Math.floor(player.z));
   player.inWater = Boolean(BLOCKS[feet].liquid);
-  const speed = player.fly ? 12 : player.inWater ? 3 : keys.ShiftLeft || keys.ShiftRight ? 6.6 : 4.3;
+  const speed = (player.fly ? 12 : player.inWater ? 3 : keys.ShiftLeft || keys.ShiftRight ? 6.6 : 4.3) * (chillTimer > 0 ? 0.55 : 1);
+  if ((ahead || across) && (player.grounded || player.fly)) walkPhase += dt * (keys.ShiftLeft || keys.ShiftRight ? 13 : 9);
   wx = (wx / length) * speed * dt;
   wz = (wz / length) * speed * dt;
   if (player.fly) player.vy = ((keys.Space ? 1 : 0) - (keys.ShiftLeft || keys.ShiftRight ? 1 : 0)) * 9;
@@ -628,8 +744,8 @@ function breakBlock(x, y, z) {
     else if (id === BERRY_BUSH) give(BERRIES, 2);
     else {
       give(id, 1);
-      if (id === LEAVES && Math.random() < 0.12) give(SAPLING, 1);
-      if (id === LEAVES && Math.random() < 0.12) give(BERRIES, 1);
+      if (BLOCKS[id].leaf && Math.random() < 0.12) give(SAPLING, 1);
+      if (BLOCKS[id].leaf && Math.random() < 0.12) give(BERRIES, 1);
     }
   }
   // A plant standing on this block falls off
@@ -637,10 +753,11 @@ function breakBlock(x, y, z) {
 }
 
 function dig(dt) {
-  if (!mouse.left || !target || BLOCKS[target.id].hard === undefined) {
+  if (!mouse.left || !target || BLOCKS[target.id].hard === undefined || heldWeapon()) {
     digging = null;
     return;
   }
+  if (swing <= 0) swing = 1;              // (your hand keeps chopping while you dig)
   const name = target.x + "," + target.y + "," + target.z;
   if (!digging || digging.name !== name) digging = { name: name, time: 0 };
   // A better pick digs faster (most of all through rock)
@@ -668,7 +785,7 @@ function useOrPlace() {
     sfx.pick();
     return drawBelt();
   }
-  if (!target || !held || have(held) < 1) return;
+  if (!target || !held || have(held) < 1 || BLOCKS[held].item) return;      // (weapons and other things you hold can't be built with)
   // Build on the side of the block you are looking at (or right on top of a plant)
   const onPlant = BLOCKS[target.id].plant;
   const x = target.x + (onPlant ? 0 : target.nx);
@@ -683,6 +800,7 @@ function useOrPlace() {
   if (!state.builder) state.inv[held]--;
   if (held === SAPLING) state.grow.push([x, y, z, state.clock + 40]);
   sfx.put();
+  swing = 1;
   drawBelt();
 }
 
@@ -729,7 +847,7 @@ function sleep() {
   state.time = 0.02;
   state.day++;
   state.hp = 10;
-  for (const creature of creatures.filter((c) => c.kind === "gloom")) removeCreature(creature);
+  for (const creature of creatures.filter((c) => c.def.hostile)) removeCreature(creature);
   toast("Good morning! Day " + state.day + ".", 4);
 }
 
@@ -781,8 +899,34 @@ const CREATURES = {
     [0.18, 0.1, 0.26, -0.16, 0.05, 0.04, 0xc87ab0, 1], [0.18, 0.1, 0.26, 0.16, 0.05, 0.04, 0xc87ab0, 1]] },
   fish: { tall: 0.3, speed: 1.6, fish: true, lands: ["water"], parts: [
     [0.14, 0.22, 0.42, 0, 0.15, 0, 0xf08a3a], [0.04, 0.2, 0.18, 0, 0.15, -0.3, 0xffffff], [0.15, 0.06, 0.1, 0, 0.2, 0.1, 0xffffff], [0.03, 0.04, 0.04, -0.075, 0.18, 0.15, 0x1d1730], [0.03, 0.04, 0.04, 0.075, 0.18, 0.15, 0x1d1730]] },
-  gloom: { tall: 0.9, speed: 2.3, gloom: true, lands: [], parts: [
+  // Monsters. hostile: it comes after you. when: "night" (it vanishes at sunrise) or "cave" (it lives underground).
+  // hp: how much harm it can take. hit: how many hearts it takes from you. fears: it stays this far from lanterns.
+  // hover: it floats this high. spits: it keeps its distance and spits. chill: its touch slows you down. drops: [what, how likely, how many at most].
+  gloom: { name: "Gloom", tall: 0.9, speed: 2.3, hostile: true, hover: 1.3, hp: 3, hit: 1, when: "night", fears: 7, says: "A Gloom got you! Hit it, or get near a lantern.", drops: [[COAL, 0.3, 1]], lands: [], parts: [
     [0.8, 0.8, 0.8, 0, 0.45, 0, 0x241a3c], [0.6, 0.2, 0.6, 0, 0.95, 0, 0x33265a], [0.16, 0.1, 0.04, -0.18, 0.5, 0.41, 0xd8ff5a, 0, 1], [0.16, 0.1, 0.04, 0.18, 0.5, 0.41, 0xd8ff5a, 0, 1]] },
+  prowler: { name: "Prowler", tall: 0.95, speed: 3.3, hostile: true, hp: 6, hit: 2, when: "night", fears: 4.5, says: "A Prowler bit you! Fight back, or stand by a lantern.", drops: [[ARROW, 0.5, 3]], lands: ["plains", "forest"], parts: [
+    [0.42, 0.42, 1, 0, 0.62, 0, 0x2a3044], [0.4, 0.38, 0.42, 0, 0.78, 0.62, 0x353c54], [0.2, 0.16, 0.22, 0, 0.7, 0.9, 0x1c2030], [0.1, 0.18, 0.08, -0.13, 1.04, 0.6, 0x1c2030], [0.1, 0.18, 0.08, 0.13, 1.04, 0.6, 0x1c2030],
+    [0.08, 0.06, 0.03, -0.1, 0.84, 0.835, 0xff3a3a, 0, 1], [0.08, 0.06, 0.03, 0.1, 0.84, 0.835, 0xff3a3a, 0, 1], [0.14, 0.14, 0.5, 0, 0.74, -0.7, 0x1c2030],
+    [0.14, 0.44, 0.14, -0.14, 0.22, 0.36, 0x1c2030, 1], [0.14, 0.44, 0.14, 0.14, 0.22, 0.36, 0x1c2030, 1], [0.14, 0.44, 0.14, -0.14, 0.22, -0.36, 0x1c2030, 1], [0.14, 0.44, 0.14, 0.14, 0.22, -0.36, 0x1c2030, 1]] },
+  spitter: { name: "Spitter", tall: 1.2, speed: 1.7, hostile: true, hp: 4, hit: 1, when: "night", spits: true, fears: 4, says: "A Spitter hit you! Dodge its spit, or shoot it with a bow.", drops: [[BERRIES, 0.5, 3]], lands: ["desert", "plains"], parts: [
+    [0.62, 0.6, 0.62, 0, 0.55, 0, 0x5aa83a], [0.5, 0.3, 0.06, 0, 0.45, 0.32, 0xc8e88a], [0.34, 0.3, 0.4, 0, 0.95, 0.3, 0x6ab848], [0.2, 0.14, 0.04, 0, 0.9, 0.51, 0x2a1a2a],
+    [0.09, 0.09, 0.03, -0.11, 1.05, 0.505, 0xfff04a, 0, 1], [0.09, 0.09, 0.03, 0.11, 1.05, 0.505, 0xfff04a, 0, 1], [0.06, 0.4, 0.5, 0, 1.05, -0.2, 0xe8642a],
+    [0.18, 0.26, 0.22, -0.2, 0.13, 0, 0x3f8a2a, 1], [0.18, 0.26, 0.22, 0.2, 0.13, 0, 0x3f8a2a, 1]] },
+  frostling: { name: "Frostling", tall: 0.7, speed: 2.6, hop: 5.5, hostile: true, hp: 3, hit: 1, when: "night", chill: true, fears: 5, says: "A Frostling froze your toes! You are slowed down for a moment.", drops: [[SNOW_BLOCK, 0.6, 3]], lands: ["snow"], parts: [
+    [0.5, 0.5, 0.5, 0, 0.35, 0, 0x9ad8f5], [0.12, 0.3, 0.12, 0, 0.74, 0, 0xffffff], [0.3, 0.1, 0.1, -0.36, 0.4, 0, 0xffffff], [0.3, 0.1, 0.1, 0.36, 0.4, 0, 0xffffff],
+    [0.09, 0.09, 0.03, -0.12, 0.42, 0.255, 0x2a4ad8, 0, 1], [0.09, 0.09, 0.03, 0.12, 0.42, 0.255, 0x2a4ad8, 0, 1]] },
+  crawler: { name: "Crawler", tall: 0.55, speed: 3.5, hostile: true, hp: 5, hit: 1, when: "cave", fears: 6, says: "A Crawler nipped you! They live in the dark: light your tunnels with torches.", drops: [[COAL, 0.5, 2]], lands: [], parts: [
+    [0.7, 0.26, 0.8, 0, 0.32, 0, 0x4a3a5a], [0.5, 0.14, 0.56, 0, 0.5, -0.06, 0x5c4a70], [0.4, 0.22, 0.3, 0, 0.32, 0.5, 0x3a2c48],
+    [0.07, 0.07, 0.03, -0.1, 0.38, 0.655, 0xff5ae0, 0, 1], [0.07, 0.07, 0.03, 0.1, 0.38, 0.655, 0xff5ae0, 0, 1],
+    [0.42, 0.07, 0.07, -0.5, 0.2, 0.26, 0x2a2036, 1], [0.42, 0.07, 0.07, 0.5, 0.2, 0.26, 0x2a2036, 1], [0.42, 0.07, 0.07, -0.5, 0.2, 0, 0x2a2036, 1], [0.42, 0.07, 0.07, 0.5, 0.2, 0, 0x2a2036, 1],
+    [0.42, 0.07, 0.07, -0.5, 0.2, -0.26, 0x2a2036, 1], [0.42, 0.07, 0.07, 0.5, 0.2, -0.26, 0x2a2036, 1]] },
+  stonejaw: { name: "Stonejaw", tall: 2, speed: 1.3, hostile: true, hp: 14, hit: 3, when: "cave", says: "A Stonejaw thumped you! It is slow: keep your distance.", drops: [[IRON, 0.7, 2], [GOLD, 0.3, 1]], lands: [], parts: [
+    [0.3, 0.6, 0.3, -0.24, 0.3, 0, 0x6a6e7a, 1], [0.3, 0.6, 0.3, 0.24, 0.3, 0, 0x6a6e7a, 1], [0.95, 0.9, 0.6, 0, 1.05, 0, 0x868b99], [0.6, 0.1, 0.5, 0.1, 1.55, 0, 0x4a8a3a],
+    [0.6, 0.5, 0.5, 0, 1.75, 0.1, 0x7a7f8c], [0.5, 0.14, 0.2, 0, 1.5, 0.4, 0x5c6070], [0.12, 0.08, 0.03, -0.15, 1.82, 0.355, 0xffa82a, 0, 1], [0.12, 0.08, 0.03, 0.15, 1.82, 0.355, 0xffa82a, 0, 1],
+    [0.26, 0.9, 0.26, -0.62, 1.05, 0, 0x7a7f8c, 1], [0.26, 0.9, 0.26, 0.62, 1.05, 0, 0x7a7f8c, 1]] },
+  gloomking: { name: "Gloom King", tall: 2.6, speed: 2, hostile: true, hover: 1.2, hp: 30, hit: 3, when: "night", king: true, says: "The Gloom King struck you! It is not afraid of lanterns.", drops: [[GEM, 1, 2], [GOLD, 1, 3]], lands: [], parts: [
+    [1.9, 1.9, 1.9, 0, 1.1, 0, 0x241a3c], [1.4, 0.5, 1.4, 0, 2.3, 0, 0x33265a], [0.4, 0.24, 0.06, -0.42, 1.2, 0.96, 0xff5a3a, 0, 1], [0.4, 0.24, 0.06, 0.42, 1.2, 0.96, 0xff5a3a, 0, 1],
+    [1.1, 0.2, 1.1, 0, 2.65, 0, 0xf0c83a, 0, 1], [0.2, 0.3, 0.2, -0.4, 2.9, -0.4, 0xffe14a, 0, 1], [0.2, 0.3, 0.2, 0.4, 2.9, -0.4, 0xffe14a, 0, 1], [0.2, 0.3, 0.2, -0.4, 2.9, 0.4, 0xffe14a, 0, 1], [0.2, 0.3, 0.2, 0.4, 2.9, 0.4, 0xffe14a, 0, 1]] },
 };
 const WOBBLER_COLOURS = [0xf29ad8, 0x8ad8f2, 0xa8e86a, 0xffc86a, 0xc8a0ff];
 const creatures = [];
@@ -793,6 +937,8 @@ function paint(colour, bright) {
   return paints.get(name);
 }
 
+const shadowShape = new THREE.CircleGeometry(1, 16);
+const shadowPaint = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false });
 function addCreature(kind, x, y, z) {
   const def = CREATURES[kind];
   const group = new THREE.Group();
@@ -814,17 +960,24 @@ function addCreature(kind, x, y, z) {
     }
   });
   scene.add(group);
-  const creature = { kind: kind, def: def, group: group, legs: legs, x: x, y: y, z: z, vy: 0, dir: Math.random() * 6.28, walking: false, timer: 0, step: 0, happy: 0, hp: 3, grounded: false, cool: 0 };
+  // A soft round shadow on the ground under it
+  const shadow = new THREE.Mesh(shadowShape, shadowPaint);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.scale.setScalar(Math.max(0.35, def.tall * 0.42));
+  shadow.visible = !def.fish && !def.swims;
+  scene.add(shadow);
+  const creature = { kind: kind, def: def, group: group, legs: legs, shadow: shadow, x: x, y: y, z: z, vy: 0, dir: Math.random() * 6.28, walking: false, timer: 0, step: 0, happy: 0, hp: def.hp || 3, grounded: false, cool: 0, flash: 0, spiked: 0 };
   creatures.push(creature);
   return creature;
 }
 function removeCreature(creature) {
   scene.remove(creature.group);
+  scene.remove(creature.shadow);
   creatures.splice(creatures.indexOf(creature), 1);
 }
 
 function pet(creature) {
-  if (creature.def.gloom) return;
+  if (creature.def.hostile) return;
   creature.happy = 1.2;
   creature.walking = false;
   creature.timer = 2;
@@ -833,27 +986,176 @@ function pet(creature) {
   toast("The " + creature.kind + " likes you!", 1.5);
 }
 
-// Left click: hit a Gloom (or startle an animal)
-function whack() {
-  const seen = lookAtCreature(4.5);
-  if (!seen || (target && target.far < seen.far)) return;
+// ----- Fighting -----
+let attackWait = 0;        // seconds until you can strike again
+let swing = 0;             // your arm swinging: 1 at the start of a swing, falling to 0
+let walkPhase = 0;         // (counts up as you walk, to make your hand bob)
+let chillTimer = 0;        // seconds of being slowed down by a Frostling
+let kingDay = 0;           // the last day the Gloom King came
+// The weapon in your hand (or nothing, if you are holding a block or your hands are empty)
+function heldWeapon() {
+  const held = state.slots[state.sel];
+  return held && have(held) > 0 ? BLOCKS[held].weapon || null : null;
+}
+// Hurt a monster. It is knocked back, and when its health runs out it bursts, and may drop something.
+function harm(creature, amount, pushX, pushZ) {
+  creature.hp -= amount;
+  creature.flash = 0.2;
+  const nx = creature.x + pushX, nz = creature.z + pushZ;
+  if (!isSolid(getBlock(Math.floor(nx), Math.floor(creature.y + 0.3), Math.floor(nz)))) {
+    creature.x = nx;
+    creature.z = nz;
+  }
+  puff(creature.x, creature.y + creature.def.tall * 0.5, creature.z, SMOKE, 8, 4);
+  sfx.crack();
+  if (creature.hp > 0) return false;
+  puff(creature.x, creature.y + creature.def.tall * 0.5, creature.z, SPARK, 16, 5);
+  if (!state.builder) {
+    for (const [id, chance, most] of creature.def.drops || []) {
+      if (Math.random() >= chance) continue;
+      const count = 1 + Math.floor(Math.random() * most);
+      give(id, count);
+      toast("The " + creature.def.name + " dropped " + count + " x " + BLOCKS[id].name + "!", 4);
+    }
+  }
+  removeCreature(creature);
+  return true;
+}
+// A hammer blow shakes the ground and hits every monster close to where it lands
+function smash(x, y, z, weapon) {
+  puff(x, y + 0.2, z, SMOKE, 18, 6);
+  shake = 0.25;
+  sfx.boom();
+  for (const creature of creatures.slice()) {
+    if (!creature.def.hostile || Math.hypot(creature.x - x, creature.z - z) > weapon.smash || Math.abs(creature.y - y) > 2.6) continue;
+    const away = Math.atan2(creature.x - player.x, creature.z - player.z);
+    harm(creature, weapon.hit, Math.sin(away) * 2.6, Math.cos(away) * 2.6);
+  }
+}
+// Left click: strike with whatever you are holding (or shoot, if it is a bow). Animals are only startled.
+function attack() {
+  const weapon = heldWeapon();
+  const seen = lookAtCreature(4.8);
+  const blockFirst = Boolean(target && seen && target.far < seen.far);
+  if (weapon) mouse.left = false;                       // (a weapon doesn't dig)
+  if (attackWait > 0) return;
+  if (weapon && weapon.bow) {
+    if (have(ARROW) < 1) return toast("No arrows! Make some from planks and gravel.", 3);
+    if (!state.builder) state.inv[ARROW]--;
+    const way = lookDirection(), eye = camera.position;
+    shoot(eye.x + way[0] * 0.6, eye.y - 0.15 + way[1] * 0.6, eye.z + way[2] * 0.6, way[0] * 30, way[1] * 30 + 1.5, way[2] * 30, true, weapon.hit);
+    attackWait = weapon.wait;
+    swing = 1;
+    sfx.put();
+    return drawBelt();
+  }
+  if (weapon) {
+    swing = 1;
+    attackWait = weapon.wait;
+  }
+  if (!seen || blockFirst) {
+    if (weapon && weapon.smash && target) smash(target.x + 0.5, target.y + 1, target.z + 0.5, weapon);
+    return;
+  }
   const creature = seen.creature;
   mouse.left = false;
-  if (!creature.def.gloom) {
+  if (!creature.def.hostile) {
     creature.dir = Math.atan2(creature.x - player.x, creature.z - player.z);
     creature.walking = true;
     creature.timer = 2;
     return;
   }
-  creature.hp -= 1 + state.pick;
-  creature.x += -Math.sin(player.yaw) * 1.5;
-  creature.z += -Math.cos(player.yaw) * 1.5;
-  puff(creature.x, creature.y + 0.5, creature.z, SMOKE, 8, 4);
-  sfx.crack();
-  if (creature.hp <= 0) {
-    puff(creature.x, creature.y + 0.5, creature.z, SPARK, 14, 5);
-    removeCreature(creature);
+  swing = 1;
+  if (!weapon) attackWait = 0.3;
+  if (weapon && weapon.smash) return smash(creature.x, creature.y, creature.z, weapon);
+  harm(creature, weapon ? weapon.hit : 1 + state.pick, -Math.sin(player.yaw) * 1.5, -Math.cos(player.yaw) * 1.5);
+}
+
+// ----- Things that fly: your arrows, and what Spitters spit -----
+const shots = [];
+const arrowShape = new THREE.BoxGeometry(0.07, 0.07, 0.7), spitShape = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+const SLIME = new THREE.Color(0x9ae84a);
+function shoot(x, y, z, vx, vy, vz, mine, hit) {
+  const mesh = new THREE.Mesh(mine ? arrowShape : spitShape, paint(mine ? 0xc89a5c : 0x9ae84a, !mine));
+  scene.add(mesh);
+  shots.push({ x: x, y: y, z: z, vx: vx, vy: vy, vz: vz, mine: mine, hit: hit, life: 3, mesh: mesh });
+}
+function spit(creature) {
+  const x = creature.x, y = creature.y + creature.def.tall * 0.8, z = creature.z;
+  const dx = player.x - x, dy = player.y + 1 - y, dz = player.z - z, far = Math.hypot(dx, dy, dz) || 1;
+  shoot(x, y, z, (dx / far) * 11, (dy / far) * 11 + far * 0.14, (dz / far) * 11, false, creature.def.hit);
+  sfx.put();
+}
+function updateShots(dt) {
+  for (const shot of shots.slice()) {
+    shot.life -= dt;
+    shot.vy -= (shot.mine ? 9 : 3) * dt;              // (they curve down as they fly)
+    shot.x += shot.vx * dt;
+    shot.y += shot.vy * dt;
+    shot.z += shot.vz * dt;
+    let done = shot.life <= 0 || isSolid(getBlock(Math.floor(shot.x), Math.floor(shot.y), Math.floor(shot.z)));
+    if (!done && shot.mine) {
+      for (const creature of creatures) {
+        if (!creature.def.hostile || Math.hypot(creature.x - shot.x, creature.y + creature.def.tall / 2 - shot.y, creature.z - shot.z) > creature.def.tall * 0.5 + 0.35) continue;
+        harm(creature, shot.hit, shot.vx * 0.04, shot.vz * 0.04);
+        done = true;
+        break;
+      }
+    } else if (!done && Math.hypot(player.x - shot.x, player.y + 0.9 - shot.y, player.z - shot.z) < 0.7) {
+      hurt(shot.hit, "A Spitter hit you! Dodge its spit, or shoot it with a bow.");
+      done = true;
+    }
+    if (done) {
+      puff(shot.x, shot.y, shot.z, shot.mine ? SMOKE : SLIME, 4, 2);
+      scene.remove(shot.mesh);
+      shots.splice(shots.indexOf(shot), 1);
+      continue;
+    }
+    shot.mesh.position.set(shot.x, shot.y, shot.z);
+    shot.mesh.lookAt(shot.x + shot.vx, shot.y + shot.vy, shot.z + shot.vz);
   }
+}
+
+// ----- Your hand, and what it holds -----
+const hand = new THREE.Group();
+const armMesh = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.46), new THREE.MeshLambertMaterial({ color: 0xe8b890 }));
+armMesh.position.set(0.03, -0.05, 0.16);
+const heldThing = new THREE.Group();
+hand.add(armMesh, heldThing);
+handScene.add(hand);
+const heldPictures = new Map();
+let heldShown = -1;
+function showHeld(id) {
+  heldShown = id;
+  while (heldThing.children.length) heldThing.remove(heldThing.children[0]);
+  if (!id) return;
+  if (!heldPictures.has(id)) {
+    const picture = new THREE.CanvasTexture(iconCanvases[id]);
+    picture.magFilter = picture.minFilter = THREE.NearestFilter;
+    heldPictures.set(id, picture);
+  }
+  const kind = BLOCKS[id], picture = heldPictures.get(id);
+  if (kind.item || kind.plant) {
+    // Flat things (weapons, berries, flowers, torches) are held up like a card
+    const flat = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshLambertMaterial({ map: picture, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide }));
+    flat.position.set(-0.03, 0.11, -0.1);
+    flat.rotation.set(0, -0.45, kind.weapon ? 0.15 : 0);
+    if (kind.weapon) flat.scale.x = -1;               // (so the blade points in towards the middle of the screen)
+    heldThing.add(flat);
+  } else {
+    const cube = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.17, 0.17), new THREE.MeshLambertMaterial({ map: picture }));
+    cube.position.set(0, 0.07, -0.12);
+    cube.rotation.y = 0.5;
+    heldThing.add(cube);
+  }
+}
+function updateHand(dt) {
+  const held = state.slots[state.sel], shown = held && have(held) > 0 ? held : 0;
+  if (shown !== heldShown) showHeld(shown);
+  if (swing > 0) swing = Math.max(0, swing - dt * 4.5);
+  const bob = Math.sin(walkPhase) * 0.012, blow = Math.sin(swing * Math.PI);
+  hand.position.set(0.34 + Math.cos(walkPhase * 0.5) * 0.008, -0.3 + bob - blow * 0.06, -0.52 - blow * 0.14);
+  hand.rotation.set(0.1 - blow * 0.9, -0.12 - blow * 0.25, 0);
 }
 
 function nearLantern(x, y, z, reach) {
@@ -879,13 +1181,38 @@ function updateCreatures(dt) {
     const land = landAt(x, z);
     const kind = land.h < SEA ? "water" : land.kind;
     const night = sunHeight < -0.12;
-    const animals = creatures.filter((c) => !c.def.gloom).length;
-    const glooms = creatures.length - animals;
-    if (night && !state.builder && glooms < 4 && far > 16 && kind !== "water" && Math.random() < 0.35) {
-      const y = groundAt(x, z) + 1;
-      if (!nearLantern(x, y, z, 10)) addCreature("gloom", x + 0.5, y, z + 0.5);
-    } else if (animals < 14) {
-      const choices = Object.keys(CREATURES).filter((name) => CREATURES[name].lands.includes(kind));
+    const hostiles = creatures.filter((c) => c.def.hostile).length;
+    const animals = creatures.length - hostiles;
+    const under = player.y < landAt(Math.floor(player.x), Math.floor(player.z)).h - 5;        // are you down in a cave or a mine?
+    let made = false;
+    if (!state.builder && hostiles < 6) {
+      if (under && Math.random() < 0.5) {
+        // Cave monsters: look for a dark spot nearby with room to stand
+        for (let tries = 0; tries < 14 && !made; tries++) {
+          const sx = Math.floor(player.x + (Math.random() - 0.5) * 30), sy = Math.floor(player.y + (Math.random() - 0.5) * 8), sz = Math.floor(player.z + (Math.random() - 0.5) * 30);
+          if (Math.hypot(sx - player.x, sz - player.z) < 7 || sy < 2 || sy >= landAt(sx, sz).h - 3) continue;
+          if (getBlock(sx, sy, sz) !== AIR || getBlock(sx, sy + 1, sz) !== AIR || !isSolid(getBlock(sx, sy - 1, sz)) || nearLantern(sx, sy, sz, 9)) continue;
+          addCreature(sy < 16 && Math.random() < 0.3 ? "stonejaw" : "crawler", sx + 0.5, sy, sz + 0.5);
+          made = true;
+        }
+      } else if (night && far > 16 && kind !== "water" && Math.random() < 0.45) {
+        const y = groundAt(x, z) + 1;
+        if (!nearLantern(x, y, z, 10)) {
+          // Glooms come out everywhere. Each kind of land has its own monsters too.
+          const choices = ["gloom", "gloom"].concat(Object.keys(CREATURES).filter((name) => CREATURES[name].hostile && CREATURES[name].when === "night" && CREATURES[name].lands.includes(kind)));
+          let name = choices[Math.floor(Math.random() * choices.length)];
+          if (state.day >= 3 && kingDay !== state.day && Math.random() < 0.08) {
+            name = "gloomking";
+            kingDay = state.day;
+            toast("The ground trembles... the GLOOM KING is near!", 5);
+          }
+          addCreature(name, x + 0.5, y, z + 0.5);
+          made = true;
+        }
+      }
+    }
+    if (!made && animals < 14) {
+      const choices = Object.keys(CREATURES).filter((name) => !CREATURES[name].hostile && CREATURES[name].lands.includes(kind));
       const name = choices[Math.floor(Math.random() * choices.length)];
       if (name === "fish") addCreature(name, x + 0.5, land.h + 1 + Math.random() * Math.max(0.5, SEA - land.h - 2), z + 0.5);
       else if (name === "duck") addCreature(name, x + 0.5, SEA + 0.6, z + 0.5);
@@ -896,8 +1223,8 @@ function updateCreatures(dt) {
     const def = c.def;
     const toX = player.x - c.x, toZ = player.z - c.z;
     const away = Math.hypot(toX, toZ);
-    if (away > 70 || (def.gloom && sunHeight > 0.02)) {
-      if (def.gloom && away < 70) puff(c.x, c.y + 0.5, c.z, SMOKE, 10, 3);
+    if (away > 70 || (def.when === "night" && sunHeight > 0.02) || (def.when === "cave" && away > 36)) {
+      if (def.hostile && away < 70) puff(c.x, c.y + 0.5, c.z, SMOKE, 10, 3);
       removeCreature(c);
       continue;
     }
@@ -908,14 +1235,25 @@ function updateCreatures(dt) {
       c.dir = Math.random() * 6.28;
     }
     let speed = c.walking ? def.speed : 0;
-    if (def.gloom) {
-      // Glooms drift straight at you. Lanterns keep them away.
+    if (def.hostile) {
+      // Monsters come straight at you. Lanterns and torches keep most of them away. Spitters stay back and spit.
       c.dir = Math.atan2(toX, toZ);
-      speed = nearLantern(c.x, c.y, c.z, 7) ? -def.speed : away > 1 ? def.speed : 0;
+      const scared = def.fears && nearLantern(c.x, c.y, c.z, def.fears);
+      const sees = away < (def.when === "cave" ? 16 : 44);
+      speed = scared ? -def.speed : !sees ? 0 : def.spits ? (away < 5 ? -def.speed : away > 9 ? def.speed : 0) : away > 1 ? def.speed : 0;
       c.cool -= dt;
-      if (away < 1.2 && Math.abs(player.y - c.y) < 2 && c.cool <= 0) {
+      if (def.spits && sees && away < 13 && c.cool <= 0) {
+        c.cool = 2.4;
+        spit(c);
+      } else if (!def.spits && away < (def.tall > 1.5 ? 1.8 : 1.25) && Math.abs(player.y - c.y) < 2.4 && c.cool <= 0) {
         c.cool = 1.2;
-        hurt(1, "A Gloom got you! Hit it, or get near a lantern.");
+        hurt(def.hit, def.says);
+        if (def.chill) chillTimer = 2.5;
+      }
+      // A spike trap hurts any monster standing in it
+      if (BLOCKS[getBlock(Math.floor(c.x), Math.floor(c.y + 0.1), Math.floor(c.z))].spikes && (c.spiked -= dt) <= 0) {
+        c.spiked = 0.7;
+        if (harm(c, 2, 0, 0)) continue;
       }
     } else if (def.shy && away < 3.5) {
       c.dir = Math.atan2(-toX, -toZ);       // run away!
@@ -940,14 +1278,14 @@ function updateCreatures(dt) {
     }
     if (isSolid(front)) {
       if (!isSolid(getBlock(Math.floor(nx + Math.sin(c.dir) * 0.35), Math.floor(c.y + 1.1), Math.floor(nz + Math.cos(c.dir) * 0.35))) && c.grounded) c.vy = 7;   // hop up a step
-      else if (c.grounded && !def.gloom) c.dir += 1.6 + Math.random() * 2;
-    } else if (BLOCKS[front].liquid && !def.swims && !def.gloom) c.dir += 2.5 + Math.random();       // keep out of the water
+      else if (c.grounded && !def.hostile) c.dir += 1.6 + Math.random() * 2;
+    } else if (BLOCKS[front].liquid && !def.swims && !def.hover) c.dir += 2.5 + Math.random();       // keep out of the water
     else { c.x = nx; c.z = nz; }
     if (def.hop && speed && c.grounded) c.vy = def.hop;
     // Gravity (ducks float; Glooms hover)
     const under = getBlock(Math.floor(c.x), Math.floor(c.y - 0.05), Math.floor(c.z));
     c.grounded = false;
-    if (def.gloom) c.y += (groundAt(Math.floor(c.x), Math.floor(c.z)) + 1.3 + Math.sin(state.clock * 3 + c.x) * 0.2 - c.y) * Math.min(1, dt * 3);
+    if (def.hover) c.y += (groundAt(Math.floor(c.x), Math.floor(c.z)) + def.hover + Math.sin(state.clock * 3 + c.x) * 0.2 - c.y) * Math.min(1, dt * 3);
     else if (def.swims && BLOCKS[getBlock(Math.floor(c.x), Math.floor(c.y + 0.2), Math.floor(c.z))].liquid) { c.y += (SEA + 0.62 - c.y) * Math.min(1, dt * 6); c.vy = 0; c.grounded = true; }
     else {
       c.vy -= 22 * dt;
@@ -964,6 +1302,13 @@ function updateCreatures(dt) {
     c.group.position.set(c.x, c.y, c.z);
     c.group.rotation.y = c.dir;
     c.group.rotation.z = def.waddle && speed ? Math.sin(c.step) * 0.14 : 0;
+    if (c.flash > 0) c.flash -= dt;
+    c.group.scale.setScalar(c.flash > 0 ? 1.18 : 1);            // (it puffs up for a moment when it is hit)
+    // Its shadow lies on the first solid block underneath it
+    let floor = Math.floor(c.y + 0.2);
+    while (floor > 0 && !isSolid(getBlock(Math.floor(c.x), floor - 1, Math.floor(c.z)))) floor--;
+    c.shadow.position.set(c.x, floor + 0.03, c.z);
+    c.shadow.material.opacity = 0.28;
   }
 }
 
@@ -1009,7 +1354,11 @@ function update(dt) {
     state.grow.splice(state.grow.indexOf(seed), 1);
     if (getBlock(seed[0], seed[1], seed[2]) === SAPLING) growTree(seed[0], seed[1], seed[2]);
   }
+  if (attackWait > 0) attackWait -= dt;
+  if (chillTimer > 0) chillTimer -= dt;
   updateCreatures(dt);
+  updateShots(dt);
+  updateHand(dt);
   updateBits(dt);
   // Hearts slowly come back
   if (state.hp < 10 && (healTimer += dt) > 12) {
@@ -1022,7 +1371,7 @@ function update(dt) {
     el("hearts").textContent = state.builder ? "" : "♥".repeat(Math.max(0, state.hp)) + "♡".repeat(Math.max(0, 10 - state.hp));
     el("where").textContent = "X " + Math.floor(player.x) + "  Y " + Math.floor(player.y) + "  Z " + Math.floor(player.z) + "  " + landAt(Math.floor(player.x), Math.floor(player.z)).kind;
     el("clock").textContent = "Day " + state.day + ", " + part;
-    el("tool").textContent = ["Bare hands", "Stone pick", "Iron pick", "Skygem pick"][state.pick];
+    el("tool").textContent = ["Bare hands", "Stone pick", "Iron pick", "Skygem pick"][state.pick] + (chillTimer > 0 ? " · chilled!" : "");
   }
   if ((saveTimer += dt) > 10) {
     saveTimer = 0;
@@ -1042,6 +1391,11 @@ function frame(now) {
   updateChunks(dt);
   updateSky(dt);
   renderer.render(scene, camera);
+  // Then your hand is drawn on top (so it never pokes into a wall)
+  renderer.autoClear = false;
+  renderer.clearDepth();
+  renderer.render(handScene, handCamera);
+  renderer.autoClear = true;
   requestAnimationFrame(frame);
 }
 
@@ -1060,7 +1414,7 @@ function setMode(creative) {
         const fresh = starters.find((block) => !state.slots.includes(block));
         if (!id && fresh) state.slots[i] = fresh;
       });
-      for (const creature of creatures.filter((c) => c.def.gloom)) removeCreature(creature);    // no Glooms in Creative mode
+      for (const creature of creatures.filter((c) => c.def.hostile)) removeCreature(creature);    // no monsters in Creative mode
     }
   }
   el("mode-button").textContent = state.builder ? "Mode: Creative" : "Mode: Explorer";
@@ -1095,7 +1449,7 @@ requestAnimationFrame(frame);
 // Only for testing the game.
 window.CW = {
   player: player, keys: keys, mouse: mouse, creatures: creatures, fuses: fuses,
-  state: () => state, target: () => target, give: give, breakBlock: breakBlock, useOrPlace: useOrPlace, whack: whack,
+  state: () => state, target: () => target, give: give, breakBlock: breakBlock, useOrPlace: useOrPlace, attack: attack, harm: harm, shots: shots, shoot: shoot,
   addCreature: addCreature, explode: explode, toggleBag: toggleBag, startWorld: startWorld, save: save, hurt: hurt,
   loading: () => loading, chunksDrawn: () => [...world.chunks.values()].filter((chunk) => chunk.mesh).length,
 };

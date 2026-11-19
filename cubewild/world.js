@@ -58,6 +58,14 @@ const ore = (colour, shine) => (x, y, r, n) => {
 };
 const boards = (light, dark, seam) => (x, y, r) => (y % 4 === 3 || (x + Math.floor(y / 4) * 5) % 8 === 0 ? seam : r < 0.2 ? dark : light);
 const metal = (light, mid, dark) => (x, y, r) => (x === 0 || y === 0 ? light : x === 15 || y === 15 ? dark : (x === 3 || x === 12) && (y === 3 || y === 12) ? dark : r < 0.1 ? light : mid);
+// A sword, pointing up to the right: a blade two pixels wide, a cross-guard and a wooden handle
+const sword = (blade, shine) => (x, y) => {
+  const along = x + y;
+  if ((along === 15 || along === 16) && y <= 10) return along === 15 ? blade : shine;
+  if ((x - y === -7 || x - y === -6) && x >= 2 && x <= 7) return "#6a4a26";
+  if ((along === 15 || along === 16) && y >= 12 && y <= 14) return "#8f6a3a";
+  return null;
+};
 const flower = (petal) => (x, y) => {
   if (Math.hypot(x - 7.5, y - 4.5) < 1.2) return "#ffd84a";
   if (Math.hypot(x - 7.5, y - 4.5) < 3.4) return petal;
@@ -128,9 +136,49 @@ const TILES = {
   sapling: (x, y) => (Math.hypot(x - 7.5, y - 6) < 3.6 ? ((x + y) % 3 ? "#3a9a44" : "#58b040") : (x === 7 || x === 8) && y > 8 ? "#7a5836" : null),
   berryBush: (x, y, r) => (Math.hypot(x - 7.5, (y - 9) * 1.2) < 6.5 ? (r < 0.12 ? "#e8304a" : r < 0.4 ? "#2f8a3a" : "#3a9a44") : null),
   berries: (x, y) => (Math.hypot(x - 5, y - 9) < 3 || Math.hypot(x - 10, y - 10) < 3 || Math.hypot(x - 8, y - 5) < 3 ? ((x + y) % 5 === 0 ? "#ff9aa8" : "#e8304a") : null),
+  // (New pictures always go on the end, so the old ones keep their places on the sheet)
+  cobble: (x, y, r) => {
+    const row = Math.floor(y / 4), shifted = x + (row % 2) * 2, lump = hash(Math.floor(shifted / 4), row, 310);
+    return y % 4 === 3 || shifted % 4 === 3 ? "#5c6070" : lump < 0.33 ? "#8a8f9e" : lump < 0.66 ? "#7a7f8c" : r < 0.15 ? "#a4a9b6" : "#969baa";
+  },
+  polished: (x, y, r) => (x === 0 || y === 0 ? "#b8bdca" : x === 15 || y === 15 ? "#6e7380" : r < 0.06 ? "#9499a6" : "#a0a5b2"),
+  paleLogSide: (x, y, r) => (y % 5 === 2 && hash(Math.floor(x / 3), y, 311) < 0.5 ? "#3a3a3a" : r < 0.12 ? "#d8d4c4" : "#ece8d8"),
+  paleLogTop: (x, y) => { const d = Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5)); return d > 7 ? "#d8d4c4" : Math.floor(d) % 2 ? "#f0e2b8" : "#e0d0a0"; },
+  paleLeaves: (x, y, r, n) => (r < 0.14 ? null : pick(["#9ac83a", "#b0d848", "#86b830"], n * 0.6 + r * 0.4)),
+  palePlanks: boards("#ead9a8", "#dcc994", "#b09a68"),
+  pineLeaves: (x, y, r, n) => (r < 0.1 ? null : pick(["#1f5a34", "#2a6a3c", "#184a2a"], n * 0.6 + r * 0.4)),
+  copperOre: ore("#e07a3a", "#ffb07a"),
+  copperBlock: metal("#ffc09a", "#e08a4a", "#a8581c"),
+  emberOre: ore("#ff5a2a", "#ffd04a"),
+  emberBlock: (x, y, r, n) => ((x + y) % 5 === 0 ? "#ffd04a" : (x - y + 16) % 7 === 0 ? "#ff8a2a" : pick(["#c83a1a", "#e04a20", "#b02c14"], n)),
+  crystal: (x, y) => ((x + y) % 7 === 0 || (x - y + 16) % 7 === 0 ? "#f4e8ff" : (x * 3 + y) % 5 === 0 ? "#a070f0" : "#c090ff"),
+  coralPink: (x, y, r) => (noise2(x, y, 2.4, 312) > 0.62 ? "#b83a6a" : pick(["#f06a9a", "#ff8ab0", "#e0528a"], r)),
+  coralBlue: (x, y, r) => (noise2(x, y, 2.4, 313) > 0.62 ? "#2a5ab8" : pick(["#4a9af0", "#6ab4ff", "#3a84e0"], r)),
+  mud: speckled(["#5a4636", "#4e3c2e", "#64503e"], "#3a2c22"),
+  moss: (x, y, r, n) => (r < 0.07 ? "#7ab848" : pick(["#4a8a3a", "#3e7a30", "#56963f"], n)),
+  thatch: (x, y, r) => (y % 4 === 3 ? "#a8842c" : (x + y * 3) % 5 === 0 ? "#f0d86a" : r < 0.3 ? "#d8b84a" : "#e4c658"),
+  roof: (x, y, r) => (y % 4 === 3 ? "#6a2a1e" : (x + (Math.floor(y / 4) % 2) * 4) % 8 === 7 ? "#7a3222" : r < 0.2 ? "#b8482e" : "#c8553a"),
+  torch: (x, y) => ((x === 7 || x === 8) && y > 6 ? "#8f6a3a" : Math.hypot(x - 7.5, y - 4.5) < 1.6 ? "#fff3b0" : Math.hypot(x - 7.5, y - 4.5) < 3 ? "#ffa82a" : null),
+  pink: boards("#f08ab8", "#e07aa8", "#a84a78"),
+  cyan: boards("#4ac8d8", "#3eb8c8", "#2a8894"),
+  brown: boards("#8a5a36", "#7c4e2c", "#54341c"),
+  grey: boards("#9a9ea8", "#8c9098", "#5e626c"),
+  spikes: (x, y) => { const high = x % 4 === 1 || x % 4 === 2 ? 12 : 6; return y >= 16 - high ? (x % 4 === 1 ? "#e4e8f0" : x % 4 === 2 ? "#b4bac8" : "#8a909e") : null; },
+  glowGlass: (x, y) => (x === 0 || y === 0 || x === 15 || y === 15 ? "#c8a040" : (x + y) % 4 === 0 ? "#fffbe0" : "#ffe07a"),
+  pumpkinFace: (x, y, r) => (((x >= 3 && x <= 5) || (x >= 10 && x <= 12)) && y >= 4 && y <= 6 ? "#fff0a0" : y >= 9 && y <= 11 && x >= 3 && x <= 12 && (y === 10 || x % 3 !== 0) ? "#fff0a0" : x % 5 === 2 ? "#c86a1a" : r < 0.1 ? "#f29a3a" : "#e8842a"),
+  snowBricks: (x, y, r) => (y % 8 === 7 || (x + (Math.floor(y / 8) % 2) * 8) % 16 === 15 ? "#b8c8dc" : r < 0.2 ? "#e8f0f8" : "#ffffff"),
+  sandBricks: (x, y, r) => (y % 8 === 7 || (x + (Math.floor(y / 8) % 2) * 8) % 16 === 15 ? "#a88a4c" : r < 0.2 ? "#d8c080" : "#e6d090"),
+  // Things you hold rather than build with: weapons
+  swordWood: sword("#c89a5c", "#e0b878"),
+  swordStone: sword("#868b99", "#b0b5c2"),
+  swordIron: sword("#d8dce6", "#ffffff"),
+  swordGem: sword("#3ad8e8", "#c8fbff"),
+  hammer: (x, y) => (x >= 7 && x <= 14 && y >= 1 && y <= 6 ? (y === 1 || x === 7 ? "#e4e8f0" : y === 6 || x === 14 ? "#6e7380" : "#9aa0ae") : (x + y === 15 || x + y === 16) && y >= 7 && y <= 14 ? "#8f6a3a" : null),
+  bow: (x, y) => (Math.abs(Math.hypot(x - 2, y - 7.5) - 9.5) < 0.9 && x >= 6 ? "#8f6a3a" : x === 6 ? "#f2f2f6" : null),
+  arrow: (x, y) => (x >= 12 && y <= 3 && x + y >= 14 && x + y <= 16 ? "#d8dce6" : x <= 4 && y >= 11 && Math.abs(x + y - 15) <= 1 ? "#e84a3a" : x + y === 15 && x >= 3 && x <= 12 ? "#c89a5c" : null),
 };
 const TILE_NAMES = Object.keys(TILES);
-const ATLAS_COLS = 8;
+const ATLAS_COLS = 16;
 const ATLAS_ROWS = 8;
 
 // ----- The kinds of block -----
@@ -191,6 +239,38 @@ const SAPLING = block("Sapling", "sapling", { hard: 0.05, see: true, plant: true
 const BERRY_BUSH = block("Berry bush", "berryBush", { hard: 0.1, see: true, plant: true });
 const BERRIES = block("Berries", "berries", { item: true, food: 2 });   // not a block: something to eat
 
+// ----- More blocks -----
+// (New kinds of block always go on the END of the list. Saved worlds remember blocks by their number, so the old numbers must never change.)
+const COBBLE = block("Cobblestone", "cobble", { hard: 1, rock: true });
+const POLISHED = block("Polished stone", "polished", { hard: 1, rock: true });
+const PALE_LOG = block("Pale log", ["paleLogTop", "paleLogSide", "paleLogTop"], { hard: 0.7 });
+const PALE_LEAVES = block("Pale leaves", "paleLeaves", { hard: 0.15, see: true });
+const PALE_PLANKS = block("Pale planks", "palePlanks", { hard: 0.55 });
+const PINE_LEAVES = block("Pine needles", "pineLeaves", { hard: 0.15, see: true });
+const COPPER = block("Copper ore", "copperOre", { hard: 1.2, rock: true });
+const COPPER_BLOCK = block("Copper block", "copperBlock", { hard: 1.4, rock: true });
+const EMBER = block("Emberstone", "emberOre", { hard: 1.6, rock: true, glow: 0.5 });
+const EMBER_BLOCK = block("Ember block", "emberBlock", { hard: 1.4, rock: true, glow: 1, lamp: true });
+const CRYSTAL = block("Glowcrystal", "crystal", { hard: 0.8, rock: true, glow: 0.8 });
+const CORALS = [block("Pink coral", "coralPink", { hard: 0.4 }), block("Blue coral", "coralBlue", { hard: 0.4 })];
+const MUD = block("Mud", "mud", { hard: 0.4 });
+const MOSS = block("Moss", "moss", { hard: 0.4 });
+const THATCH = block("Thatch", "thatch", { hard: 0.4 });
+const ROOF = block("Roof tiles", "roof", { hard: 0.9, rock: true });
+const TORCH = block("Torch", "torch", { hard: 0.05, see: true, plant: true, still: true, glow: 1, lamp: true });      // a little light that stands on the ground
+for (const colour of ["pink", "cyan", "brown", "grey"]) PAINTS.push(block(colour[0].toUpperCase() + colour.slice(1) + " blocks", colour, { hard: 0.5 }));
+const SPIKES = block("Spike trap", "spikes", { hard: 0.3, see: true, plant: true, still: true, spikes: true });          // hurts any monster that walks into it
+const GLOW_GLASS = block("Sun lamp", "glowGlass", { hard: 0.3, glow: 1, lamp: true });
+const PUMPKIN_LAMP = block("Pumpkin lamp", ["pumpkinTop", "pumpkinFace", "pumpkinTop"], { hard: 0.5, glow: 0.9, lamp: true });
+const SNOW_BRICKS = block("Snow bricks", "snowBricks", { hard: 0.6 });
+const SAND_BRICKS = block("Sandstone bricks", "sandBricks", { hard: 0.9, rock: true });
+for (const id of [LEAVES, PALE_LEAVES, PINE_LEAVES]) BLOCKS[id].leaf = true;                // leaves rustle in the wind, and may drop a sapling
+// Weapons. hit: how much harm one blow does. wait: seconds between blows. smash: it hits everything this close to where it lands. bow: it shoots arrows.
+const SWORDS = [["Wooden sword", "swordWood", 3], ["Stone sword", "swordStone", 4], ["Iron sword", "swordIron", 6], ["Skygem sword", "swordGem", 9]].map(([name, tex, hit]) => block(name, tex, { item: true, weapon: { hit: hit, wait: 0.36 } }));
+const HAMMER = block("Iron hammer", "hammer", { item: true, weapon: { hit: 5, wait: 0.9, smash: 2.8 } });
+const BOW = block("Bow", "bow", { item: true, weapon: { bow: true, hit: 4, wait: 0.55 } });
+const ARROW = block("Arrow", "arrow", { item: true });
+
 const isSolid = (id) => id !== AIR && !BLOCKS[id].liquid && !BLOCKS[id].plant;   // can you stand on it?
 const isOpaque = (id) => !BLOCKS[id].see;                                        // does it hide what is behind it?
 
@@ -214,6 +294,28 @@ const RECIPES = [
   { needs: [[GOLD, 4]], makes: [GOLD_BLOCK, 1] },
   { needs: [[GEM, 4]], makes: [GEM_BLOCK, 1] },
   { needs: [[PAINTS[3], 1], [PAINTS[7], 1]], makes: [CHECKER, 2] },
+  { needs: [[STONE, 2]], makes: [COBBLE, 2] },
+  { needs: [[BRICKS, 4]], makes: [POLISHED, 4] },
+  { needs: [[PALE_LOG, 1]], makes: [PALE_PLANKS, 4] },
+  { needs: [[COPPER, 4]], makes: [COPPER_BLOCK, 1] },
+  { needs: [[EMBER, 4]], makes: [EMBER_BLOCK, 1] },
+  { needs: [[HAY, 2]], makes: [THATCH, 4] },
+  { needs: [[CLAY, 2], [PAINTS[0], 1]], makes: [ROOF, 4] },
+  { needs: [[LOG, 1], [COAL, 1]], makes: [TORCH, 4] },
+  { needs: [[SUNSTONE, 1], [GLASS, 1]], makes: [GLOW_GLASS, 1] },
+  { needs: [[PUMPKIN, 1], [TORCH, 1]], makes: [PUMPKIN_LAMP, 1] },
+  { needs: [[SNOW_BLOCK, 4]], makes: [SNOW_BRICKS, 4] },
+  { needs: [[SANDSTONE, 4]], makes: [SAND_BRICKS, 4] },
+  { needs: [[MOSSY, 2]], makes: [MOSS, 2] },
+  // Weapons, and a trap
+  { needs: [[PLANKS, 2], [LOG, 1]], makes: [SWORDS[0], 1] },
+  { needs: [[STONE, 2], [PLANKS, 1]], makes: [SWORDS[1], 1] },
+  { needs: [[IRON, 2], [PLANKS, 1]], makes: [SWORDS[2], 1] },
+  { needs: [[GEM, 2], [PLANKS, 1]], makes: [SWORDS[3], 1] },
+  { needs: [[IRON, 4], [LOG, 1]], makes: [HAMMER, 1] },
+  { needs: [[PLANKS, 3], [TALL_GRASS, 2]], makes: [BOW, 1] },
+  { needs: [[PLANKS, 1], [GRAVEL, 1]], makes: [ARROW, 4] },
+  { needs: [[IRON, 1], [PLANKS, 1]], makes: [SPIKES, 2] },
 ].concat(PAINTS.map((id) => ({ needs: [[PLANKS, 1]], makes: [id, 1] })));
 
 // ----- The world -----
@@ -261,7 +363,12 @@ function makeChunk(cx, cz) {
         let id;
         if (y === 0) id = DEEP;
         else if (y > land.h) id = y === SEA && land.kind === "snow" ? ICE : WATER;
-        else if (y === land.h) id = beach ? floor : desert ? SAND : land.kind === "snow" ? SNOW : GRASS;
+        else if (y === land.h) {
+          id = beach ? floor : desert ? SAND : land.kind === "snow" ? SNOW : GRASS;
+          // Patches of moss on the forest floor, and mud on low ground near the water
+          if (id === GRASS && land.kind === "forest" && noise2(wx, wz, 8, s + 42) > 0.7) id = MOSS;
+          else if (id === GRASS && land.h <= SEA + 3 && noise2(wx, wz, 6, s + 43) > 0.52) id = MUD;
+        }
         else if (y > land.h - 4) id = beach ? floor : desert ? (y > land.h - 2 ? SAND : SANDSTONE) : DIRT;
         else {
           id = y <= 2 && hash3(wx, y, wz, s + 35) < 0.55 ? NIGHTSTONE : STONE;
@@ -275,7 +382,7 @@ function makeChunk(cx, cz) {
             // Ore: each little 4x4x4 box of stone might hold one lump of something
             const bx = wx >> 2, by = y >> 2, bz = wz >> 2;
             const roll = hash3(bx, by, bz, s + 31);
-            const kind = roll < 0.1 ? COAL : roll < 0.16 && y < 24 ? IRON : roll < 0.19 && y < 14 ? GOLD : roll < 0.22 && y < 12 ? SUNSTONE : roll < 0.245 && y < 9 ? GEM : 0;
+            const kind = roll < 0.1 ? COAL : roll < 0.16 && y < 24 ? IRON : roll < 0.19 && y < 14 ? GOLD : roll < 0.22 && y < 12 ? SUNSTONE : roll < 0.245 && y < 9 ? GEM : roll < 0.3 && y < 30 ? COPPER : roll < 0.32 && y < 8 ? EMBER : roll < 0.345 && y < 22 ? CRYSTAL : 0;
             if (kind) {
               const ox = (bx << 2) + 1 + hash3(bx, by, bz, s + 32) * 2;
               const oy = (by << 2) + 1 + hash3(bx, by, bz, s + 33) * 2;
@@ -285,6 +392,11 @@ function makeChunk(cx, cz) {
           }
         }
         data[place(x, y, z)] = id;
+      }
+      // Coral grows on the sea bed, where the water is deep enough
+      if (land.h < SEA - 1 && land.kind !== "snow" && hash(wx, wz, s + 53) < 0.05) {
+        const coral = CORALS[Math.floor(hash(wx, wz, s + 54) * 2)];
+        for (let i = 1; i <= 1 + Math.floor(hash(wx, wz, s + 55) * 2); i++) data[place(x, land.h + i, z)] = coral;
       }
       // Things growing on top
       if (land.h > SEA + 1 && land.h + 3 < H) {
@@ -313,6 +425,9 @@ function makeChunk(cx, cz) {
       const trunk = treeHere(cx * CH + x, cz * CH + z, land);
       if (!trunk) continue;
       const top = land.h + trunk;
+      // Three kinds of tree: green ones, pale ones, and dark pines where it snows
+      const pale = land.kind !== "snow" && hash(cx * CH + x, cz * CH + z, s + 23) < 0.3;
+      const leaf = land.kind === "snow" ? PINE_LEAVES : pale ? PALE_LEAVES : LEAVES;
       for (let dy = -1; dy <= 2; dy++) {
         const reach = dy < 1 ? 2 : 1;
         for (let dz = -reach; dz <= reach; dz++) {
@@ -321,11 +436,11 @@ function makeChunk(cx, cz) {
             if (px < 0 || pz < 0 || px >= CH || pz >= CH || py >= H) continue;
             if (Math.abs(dx) === reach && Math.abs(dz) === reach && (dy === 2 || hash3(px + cx * CH, py, pz + cz * CH, s + 22) < 0.5)) continue;   // nibble the corners
             const now = data[place(px, py, pz)];
-            if (now === AIR || BLOCKS[now].plant) data[place(px, py, pz)] = LEAVES;
+            if (now === AIR || BLOCKS[now].plant) data[place(px, py, pz)] = leaf;
           }
         }
       }
-      if (x >= 0 && z >= 0 && x < CH && z < CH) for (let y = land.h + 1; y <= top; y++) data[place(x, y, z)] = LOG;
+      if (x >= 0 && z >= 0 && x < CH && z < CH) for (let y = land.h + 1; y <= top; y++) data[place(x, y, z)] = pale ? PALE_LOG : LOG;
     }
   }
   // Put back everything you have changed here
@@ -440,12 +555,13 @@ function meshChunk(chunk) {
   for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (const lamp of world.lamps.get(chunk.cx + dx + "," + (chunk.cz + dz)) || []) lamps.push(lamp);
   const data = chunk.data;
   const blockAt = (x, y, z) => (x >= 0 && z >= 0 && x < CH && z < CH && y >= 0 && y < H ? data[place(x, y, z)] : getBlock(ox + x, y, oz + z));
-  function corner(out, tile, i, wx, wy, wz, light, ownGlow) {
+  // ("sway" is how much this corner moves in the wind: the tops of plants a lot, leaves a little, and the top of the water bobs)
+  function corner(out, tile, i, wx, wy, wz, light, ownGlow, sway) {
     const u0 = (tile % ATLAS_COLS) / ATLAS_COLS;
     const v0 = 1 - (Math.floor(tile / ATLAS_COLS) + 1) / ATLAS_ROWS;
     out.pos.push(wx, wy, wz);
     out.uv.push(u0 + (0.002 + CORNER_UV[i][0] * 0.996) / ATLAS_COLS, v0 + (0.002 + CORNER_UV[i][1] * 0.996) / ATLAS_ROWS);
-    out.shade.push(light, light, light);
+    out.shade.push(light, sway || 0, 0);
     let glow = ownGlow || 0;
     for (const lamp of lamps) {
       const d = Math.hypot(lamp[0] + 0.5 - wx, lamp[1] + 0.5 - wy, lamp[2] + 0.5 - wz);
@@ -462,7 +578,7 @@ function meshChunk(chunk) {
         if (kind.plant) {
           for (const cross of CROSSES) {
             const first = solid.pos.length / 3;
-            for (let i = 0; i < 4; i++) corner(solid, kind.tex[1], i, ox + x + cross[i][0], y + cross[i][1], oz + z + cross[i][2], 0.95, kind.glow);
+            for (let i = 0; i < 4; i++) corner(solid, kind.tex[1], i, ox + x + cross[i][0], y + cross[i][1], oz + z + cross[i][2], 0.95, kind.glow, kind.still ? 0 : cross[i][1]);
             solid.index.push(first, first + 1, first + 2, first, first + 2, first + 3);
           }
           continue;
@@ -492,7 +608,7 @@ function meshChunk(chunk) {
               crowd = s1 && s2 ? 0 : 3 - s1 - s2 - (isOpaque(blockAt(both[0], both[1], both[2])) ? 1 : 0);
             }
             dark.push(crowd);
-            corner(out, kind.tex[face.t], i, ox + x + c[0], y + (kind.liquid && c[1] === 1 ? 0.88 : c[1]), oz + z + c[2], face.bright * SHADOW[crowd], kind.glow);
+            corner(out, kind.tex[face.t], i, ox + x + c[0], y + (kind.liquid && c[1] === 1 ? 0.88 : c[1]), oz + z + c[2], face.bright * SHADOW[crowd], kind.glow, kind.leaf ? 0.3 : kind.liquid && c[1] === 1 ? 1 : 0);
           }
           // Two triangles make the square. (Which way they split depends on the shadows, so they look smooth.)
           if (dark[0] + dark[2] >= dark[1] + dark[3]) out.index.push(first, first + 1, first + 2, first, first + 2, first + 3);

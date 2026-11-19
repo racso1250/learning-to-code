@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Deepwild</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Deepwild</h1>
+    <p id="goal">Dive under your raft and explore the sea</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+      <div id="cockpit" hidden></div>
+      <div id="crosshair">+</div>
+      <div id="meters">
+        <div class="bar"><div id="air-fill"></div></div>
+        <span id="air-text"></span>
+        <div class="bar small"><div id="hp-fill"></div></div>
+        <span>Health</span>
+      </div>
+      <p id="depth"></p>
+      <p id="compass"></p>
+      <p id="bag"></p>
+      <div id="scan" hidden><div class="bar"><div id="scan-fill"></div></div><span id="scan-text"></span></div>
+      <p id="toast" hidden></p>
+      <p id="prompt" hidden></p>
+
+      <!-- On the raft: make things, rest, read your journal, and dive back in -->
+      <div id="raft" class="panel" hidden>
+        <h2>Your raft</h2>
+        <p class="small" id="bag-list"></p>
+        <button id="dive" class="big">Dive in!</button>
+        <button id="rest">Rest until morning</button>
+        <button id="journal-button">Sea journal</button>
+        <h2>Make new gear</h2>
+        <div id="recipes"></div>
+      </div>
+      <div id="journal" class="overlay" hidden>
+        <h2>Sea journal</h2>
+        <div id="journal-list"></div>
+        <button id="journal-close">Close</button>
+      </div>
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+      <div id="intro" class="overlay">
+        <h2 class="logo">Deepwild</h2>
+        <p>You live on a little raft in the middle of the sea. Dive down and explore: sunny shallows, a kelp forest, coral gardens, a twilight slope and a dark trench. Watch your air, make better gear, scan the creatures, and find the secret at the bottom of the sea.</p>
+        <p class="keys">Mouse (click the game first) or left and right arrows: look &nbsp; W, A, S, D: swim<br>Space: swim up &nbsp; C: swim down &nbsp; Shift: zoom (with the Zipfin scooter)<br>E: pick up, use, climb &nbsp; F: torch &nbsp; Right mouse button or Q: scan a creature &nbsp; J: sea journal</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Air runs out under water: swim up to the top to breathe, or climb onto your raft (E at the ladder). Every upgrade lets you go further and deeper. If you run out of air you wake up on the raft, but the sea keeps half of what you were carrying.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="world.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>

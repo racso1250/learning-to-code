@@ -1,0 +1,318 @@
+/* Deepwild: deep sea blues and glowing greens */
+
+body {
+  background: linear-gradient(#0f3a5c, #04101e);
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px 16px;
+  color: #e8fbff;
+  font-family: "Press Start 2P", monospace;
+  text-align: center;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0 0 12px;
+  color: #7affe0;
+  text-shadow: 3px 3px 0 #0a4a5c, 0 0 16px rgba(122, 255, 224, 0.5);
+}
+
+h2 {
+  font-size: 12px;
+  color: #ffe14a;
+  margin: 0 0 10px;
+}
+
+a {
+  color: #9fd8ff;
+  font-size: 10px;
+}
+
+#goal {
+  max-width: 960px;
+  margin: 0 auto 8px;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #ffe14a;
+}
+
+.help {
+  max-width: 900px;
+  margin: 12px auto;
+  font-size: 8px;
+  line-height: 1.8;
+  color: #9fc8dc;
+}
+
+/* The game sits in a frame, and everything else is laid on top of it */
+.screen {
+  position: relative;
+  max-width: 960px;
+  margin: 0 auto;
+  border: 4px solid #1c5a7a;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #04101e;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+#tint,
+#cockpit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: box-shadow 0.2s;
+}
+
+/* Inside the Bubble you look out through a round window */
+#cockpit {
+  box-shadow: inset 0 0 0 14px #f2c02a, inset 0 0 0 20px #a8841c, inset 0 0 80px 40px rgba(0, 0, 0, 0.45);
+  border-radius: 46%;
+}
+
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+/* Air and health, bottom left */
+#meters {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: grid;
+  grid-template-columns: 170px auto;
+  gap: 6px 8px;
+  align-items: center;
+  font-size: 8px;
+  text-align: left;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.bar {
+  height: 12px;
+  border: 2px solid #e8fbff;
+  border-radius: 6px;
+  background: rgba(0, 20, 40, 0.6);
+  overflow: hidden;
+}
+
+.bar.small {
+  height: 7px;
+}
+
+#air-fill {
+  height: 100%;
+  background: #7ad8ff;
+}
+
+#hp-fill {
+  height: 100%;
+  background: #ff6a7a;
+}
+
+#depth,
+#compass,
+#bag {
+  position: absolute;
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.6;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+#depth {
+  left: 12px;
+  top: 10px;
+  text-align: left;
+  color: #bff4ff;
+}
+
+#compass {
+  left: 12px;
+  top: 28px;
+  text-align: left;
+  color: #ffe14a;
+  white-space: pre;
+}
+
+#bag {
+  right: 12px;
+  bottom: 12px;
+  max-width: 44%;
+  text-align: right;
+  color: #d8fff0;
+}
+
+#scan {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 180px;
+  transform: translateX(-50%);
+  font-size: 8px;
+  text-shadow: 1px 1px 0 #000;
+}
+
+#scan-fill {
+  height: 100%;
+  width: 0;
+  background: #7affe0;
+}
+
+#toast,
+#prompt {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 12px;
+  max-width: 76%;
+  border-radius: 8px;
+  background: rgba(4, 20, 36, 0.86);
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+#toast {
+  top: 14%;
+  border: 2px solid #ffe14a;
+  color: #fff6c8;
+}
+
+#prompt {
+  bottom: 24%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Big messages and menus */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 40px;
+  background: rgba(2, 12, 24, 0.84);
+  font-size: 10px;
+  line-height: 1.9;
+}
+
+.overlay[hidden],
+.panel[hidden] {
+  display: none;
+}
+
+.logo {
+  font-size: 30px;
+  color: #7affe0;
+  text-shadow: 4px 4px 0 #0a4a5c, 0 0 22px rgba(122, 255, 224, 0.6);
+}
+
+.keys {
+  color: #bff4ff;
+  font-size: 8px;
+}
+
+.small,
+.next {
+  font-size: 8px;
+  color: #9fc8dc;
+}
+
+#card-text {
+  max-width: 720px;
+  font-size: 11px;
+  line-height: 2;
+}
+
+/* The raft menu sits down the left side, so you can still see your raft */
+.panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 46%;
+  padding: 14px;
+  overflow-y: auto;
+  background: rgba(2, 12, 24, 0.86);
+  font-size: 8px;
+  line-height: 1.7;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+button {
+  font-family: inherit;
+  font-size: 10px;
+  padding: 9px 14px;
+  margin: 3px;
+  border: 2px solid #7affe0;
+  border-radius: 8px;
+  background: #0a3a4c;
+  color: #e8fbff;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #12566c;
+}
+
+button.big {
+  font-size: 12px;
+  background: #1c7a5c;
+}
+
+.recipe {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  font-size: 8px;
+  line-height: 1.7;
+  text-align: left;
+}
+
+.recipe:disabled {
+  opacity: 0.62;
+  cursor: default;
+  border-color: #4a6a7a;
+}
+
+.recipe.made {
+  border-color: #ffe14a;
+  opacity: 0.85;
+}
+
+.ok {
+  color: #7affa0;
+}
+
+.short {
+  color: #ff9a8a;
+}
+
+#journal-list {
+  max-width: 760px;
+  max-height: 68%;
+  overflow-y: auto;
+  font-size: 8px;
+  line-height: 1.8;
+  text-align: left;
+}
+
+.unknown {
+  color: #6a8a9a;
+}
