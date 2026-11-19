@@ -62,6 +62,7 @@ const tiles = Array.from({ length: CH }, () => new Uint8Array(CW));
 const fromMid = (tx, ty) => Math.hypot(tx + 0.5 - MID, ty + 0.5 - MID);
 const turnOf = (tx, ty) => ((Math.atan2(ty + 0.5 - MID, tx + 0.5 - MID) * 180) / Math.PI + 360) % 360;      // the angle round the city, in degrees
 const polar = (deg, r) => ({ x: MID + Math.cos((deg * Math.PI) / 180) * r, y: MID + Math.sin((deg * Math.PI) / 180) * r });
+const ROAD = 2.5;            // half the width of every road, in squares (so roads are 5 squares wide, with room for wide pavements)
 const RINGS = [23, 45, 67, 89, 111, 133, 154.5];        // how far out each ring boulevard is, in squares
 const AVENUES = [];          // every avenue: the way it points (in degrees) and how far from the middle it starts
 for (let k = 0; k < 12; k++) AVENUES.push({ deg: k * 30, from: 15 });
@@ -88,11 +89,11 @@ for (let y = 0; y < CH; y++) for (let x = 0; x < CW; x++) {
   if (d > CITY_R) kind = OUT;
   else if (d < 16) kind = PLAZA;
   else {
-    // seven ring boulevards, and avenues running outwards (all 3 squares wide)
-    let road = RINGS.some((r) => Math.abs(d - r) < 1.5);
+    // seven ring boulevards, and avenues running outwards
+    let road = RINGS.some((r) => Math.abs(d - r) < ROAD);
     for (const avenue of AVENUES) {
       const a = (avenue.deg * Math.PI) / 180, along = dx * Math.cos(a) + dy * Math.sin(a), off = Math.abs(dy * Math.cos(a) - dx * Math.sin(a));
-      if (along > avenue.from && off < 1.5) road = true;
+      if (along > avenue.from && off < ROAD) road = true;
     }
     if (road) kind = STREET;
     else if (Math.abs(y + 0.5 - (MID - 36 + Math.sin(x / 14) * 5)) < 2.5) kind = POND;        // the river (streets cross it on bridges)
@@ -138,7 +139,7 @@ const lamps = [], trees = [];
 for (let y = 1; y < CH - 1; y++) for (let x = 1; x < CW - 1; x++) if (tiles[y][x] === TREE) trees.push({ x: x * TILE + 8, y: y * TILE + 8 });
 // Street lamps stand in neat rows along the kerbs of the ring boulevards
 for (const r of RINGS.slice(0, 6)) for (let k = 0; k < (r > 80 ? 48 : 24); k++) {
-  const spot = polar((k + 0.5) * (r > 80 ? 7.5 : 15), r + (k % 2 ? 1.75 : -1.75));
+  const spot = polar((k + 0.5) * (r > 80 ? 7.5 : 15), r + (k % 2 ? 2.1 : -2.1));
   lamps.push({ x: spot.x * TILE, y: spot.y * TILE });
 }
 const tileAt = (px, py) => {
@@ -174,7 +175,7 @@ const cityMap = makeCanvas(CW * 2, CH * 2);
   g.stroke();
   g.restore();
   g.strokeStyle = "#f6f2e8";
-  g.lineWidth = 6;
+  g.lineWidth = ROAD * 4;
   for (const r of RINGS) {
     g.beginPath();
     g.arc(mid, mid, r * 2, 0, 6.2832);
@@ -513,14 +514,14 @@ function placeRoute(r, min, max) {
   }
   return null;
 }
-// People stroll along the edge of the road (one in six is out for a run). Say hello and they will give you a tip.
+// People stroll along the pavements (one in six is out for a run). Say hello and they will give you a tip.
 const HELLOS = ["Fire beats Grass, Water beats Fire, and Grass beats Water. Easy to remember!", "A Fairy type makes short work of a Dragon.", "Sell your star shards at the shops with the blue signs.", "The cafes with a green cross heal your Wildlings for free.", "They say a legendary Wildling comes to the raid portals once you reach Rank 50.", "The gate matches at the tower are tough. Train in the parks first!", "Ice is super against Dragons. Brr!", "Press T to see which types beat which.", "New star shards fall on the streets every morning.", "The Battle Zone only opens at night. Press N if you can't wait.", "Wilder Wildlings live in the parks far from the station.", "I heard only a Champion has ever seen the mythical Wishling.", "Lovely day for a walk, isn't it?", "Mind the cars when you cross the road!"];
 const walkers = Array.from({ length: 14 }, function (unused, n) {
   const jog = n % 6 === 5;
-  return { route: { off: 21.5, keepLeft: false }, live: false, x: 0, y: 0, face: 0, anim: n, moving: true, jog: jog, speed: jog ? 96 : 30 + (n % 4) * 3, outfit: randomOutfit(), hello: n };
+  return { route: { off: 33, keepLeft: false }, live: false, x: 0, y: 0, face: 0, anim: n, moving: true, jog: jog, speed: jog ? 96 : 30 + (n % 4) * 3, outfit: randomOutfit(), hello: n };
 });
 // Cars drive round the roads, keeping to the left. They stop for you, for your Wildling and for each other.
-const cars = Array.from({ length: 12 }, (unused, n) => ({ route: { off: 9, keepLeft: true }, live: false, x: 0, y: 0, face: 0, speed: 0, top: 120 + (n % 4) * 14, rolled: 0, stuck: 0 }));
+const cars = Array.from({ length: 12 }, (unused, n) => ({ route: { off: 12, keepLeft: true }, live: false, x: 0, y: 0, face: 0, speed: 0, top: 120 + (n % 4) * 14, rolled: 0, stuck: 0 }));
 let firstTraffic = true;          // (when the game starts, people and cars may appear close to you)
 function updateTraffic(dt) {
   for (const walker of walkers) {
@@ -533,13 +534,13 @@ function updateTraffic(dt) {
     walker.moving = Math.hypot(walker.x - me.x, walker.y - me.y) > 19;        // (they wait politely if you stand in their way)
     if (walker.moving) {
       moveRoute(walker.route, walker.speed * dt);
-      walker.anim += dt * (walker.jog ? 12.5 : 5.4);
+      walker.anim += dt * (walker.jog ? 14 : 6.2);
     }
     const ahead = routeAhead(walker.route, 26, 0);
     if (tileAt(ahead.x, ahead.y) === POND) turnRound(walker.route);            // (a pond ahead: turn back)
-    // They keep to the edge of the road, and step in a little where a building or the river comes close
+    // They keep to the pavement, and step in a little where a building or the river comes close
     let spot = null;
-    for (const gap of [21.5, 17, 12.5]) {
+    for (const gap of [33, 28, 22]) {
       spot = routeAt(walker.route, gap);
       if (![WALL, POND, OUT, TREE].includes(tileAt(spot.x, spot.y))) break;
     }
@@ -965,7 +966,7 @@ function updatePlay(dt) {
       if (canStand(nx, ny)) Object.assign(me, { x: nx, y: ny });
     }
     me.running = !!(keys.ShiftLeft || keys.ShiftRight);
-    me.anim += dt * (me.running ? 12.5 : 8.2);          // (how fast your legs go: quicker when you run)
+    me.anim += dt * (me.running ? 14 : 9.4);          // (how fast your legs go: quicker when you run)
   }
   // Your Wildling: it follows you, dashes in to attack, and charges up its big move
   const c = lead();
@@ -1313,11 +1314,11 @@ function drawPlay() {
     const at = VIEW.project(x, y, high);
     if (at) words(text, at.x, at.y, colour, size, "center");
   };
-  for (const t of trainers) if (!t.beaten && !fight) over(t.x, t.y, 36 + Math.sin(time * 6) * 2, "!", "#ff5a5a", 10);
+  for (const t of trainers) if (!t.beaten && !fight) over(t.x, t.y, 30 + Math.sin(time * 6) * 2, "!", "#ff5a5a", 10);
   for (const foe of foes) if (foe.gone <= 0 && foe.wind && Math.floor(time * 14) % 2) over(foe.x, foe.y, 38, "!", "#ff5a5a", 10);
-  if (fight) over(fight.trainer.x, fight.trainer.y, 36, fight.trainer.name, "#ffffff", 6);
+  if (fight) over(fight.trainer.x, fight.trainer.y, 30, fight.trainer.name, "#ffffff", 6);
   const near = (thing, range) => Math.hypot(thing.x - me.x, thing.y - me.y) < range;
-  if (near(OFFICIAL, 300)) over(OFFICIAL.x, OFFICIAL.y, 40, "League Master", "#fff27a", 6);
+  if (near(OFFICIAL, 300)) over(OFFICIAL.x, OFFICIAL.y, 33, "League Master", "#fff27a", 6);
   for (const portal of RAIDS) if (portal.open && !(raid && raid.portal === portal) && near(portal, 520)) over(portal.x, portal.y, 54, (DEX[portal.id].legend ? "LEGENDARY RAID: " : DEX[portal.id].myth ? "MYTHICAL RAID: " : "RAID: ") + DEX[portal.id].name, "#e0a0ff", 6);
   for (const cafe of cafes) if (near(cafe, 260)) over(cafe.x, cafe.y - 8, 30, cafe.shop ? "SHOP" : "CAFE", cafe.shop ? "#9ac4ff" : "#7af0a0", 6);
   for (const park of PARKS) if (near({ x: park.at.x * TILE, y: park.at.y * TILE }, 420)) over(park.at.x * TILE, park.at.y * TILE, 60, park.name + "  L" + park.lv[0] + "-" + park.lv[1], "#9af0a0", 6);

@@ -69,8 +69,10 @@ const VIEW = (function () {
 
   // ----- People -----
   // A person about 30 units tall, with proper proportions: legs with knees, arms with elbows, shoulders, a neck and a face.
+  const PERSON = 0.76;         // how big people are (1 would make them tower over the cars)
   function makeHuman() {
     const group = new THREE.Group();          // where the person stands, and which way they face
+    group.scale.setScalar(PERSON);
     const body = new THREE.Group();           // the whole body: it bobs up and down and leans as they move
     const hips = new THREE.Group();           // the hips and legs
     const torso = new THREE.Group();          // everything above the waist: it twists the opposite way to the hips
@@ -128,9 +130,7 @@ const VIEW = (function () {
     const skirt = add(new THREE.Mesh(new THREE.CylinderGeometry(3.6, 5.4, 5.4, 14), m.bottom), 0, -2, 0, hips);
     skirt.scale.z = 0.85;
     const chest = add(new THREE.Mesh(new THREE.CylinderGeometry(4.4, 3.5, 8.6, 16), m.top), 0, 3.7, 0, torso);
-    chest.scale.z = 0.7;
-    const ribs = add(new THREE.Mesh(new THREE.SphereGeometry(3.8, 14, 10), m.top), 0, 5.3, 0.65, torso);      // a rounded chest
-    ribs.scale.set(1, 0.7, 0.7);
+    chest.scale.z = 0.74;
     const shoulders = add(new THREE.Mesh(new THREE.SphereGeometry(4.4, 14, 8), m.top), 0, 7.9, 0, torso);
     shoulders.scale.set(1.07, 0.42, 0.72);
     const zip = box(0.8, 8.4, 0.3, m.trim, 0, 3.8, 3.05, torso);          // a jacket's zip and collar
@@ -241,7 +241,7 @@ const VIEW = (function () {
         torso.rotation.x = mix(0.02, 0.1);
         head.rotation.y = twist * mix(0.06, 0.1);
         head.rotation.x = -mix(0.04, 0.2) + Math.sin(now * 0.9 + x) * 0.03 * still;
-        chest.scale.x = ribs.scale.x = 1 + Math.sin(now * 1.7) * 0.012 * still;            // breathing, when standing still
+        chest.scale.x = 1 + Math.sin(now * 1.7) * 0.012 * still;            // breathing, when standing still
         body.rotation.x = lean;
         // walking: highest when one leg is straight under you. Running: highest in mid-air, between steps.
         body.position.set(twist * mix(0.3, 0.15), go * ((1 - fast) * (Math.cos(step * 2) * 0.35 - 0.3) + fast * (0.5 - Math.cos(step * 2) * 0.9)), 0);
@@ -558,7 +558,7 @@ const VIEW = (function () {
       if (Math.hypot(x0 - mid, z0 - mid) > CITY_R * TILE) continue;
       flat("water", -1.3, [x0, z0 + 40], [x1, z1 + 40], [x1, z1 - 40], [x0, z0 - 40]);
     }
-    const HALF = 19;                            // half the width of a road
+    const HALF = 26;                            // half the width of the tarmac (the pavements are outside it)
     for (const r of RINGS) {
       ring("kerb", -1.0, r * TILE - HALF - 3, r * TILE + HALF + 3);
       ring("road", -0.8, r * TILE - HALF, r * TILE + HALF);
@@ -883,8 +883,8 @@ const VIEW = (function () {
       camera.lookAt(STATION.x + 30 + (1 - eased) * 260, 22, STATION.y - 20);
     } else if (dressing) {
       const side = look + 0.3;
-      camera.position.set(me.x + Math.sin(side) * 44, 21, me.y + Math.cos(side) * 44);
-      camera.lookAt(me.x + Math.cos(look) * -9, 16, me.y + Math.sin(look) * 9);
+      camera.position.set(me.x + Math.sin(side) * 35, 17, me.y + Math.cos(side) * 35);
+      camera.lookAt(me.x + Math.cos(look) * -7, 12.5, me.y + Math.sin(look) * 7);
     } else {
       let back = 58 * zoom;
       const blocked = function (far) {          // would the camera be inside a building, or right up against one?
@@ -895,7 +895,7 @@ const VIEW = (function () {
       while (back > 8 && blocked(back)) back -= 4;
       // (when it has to come in close, it also rises, so it looks down on you and never fills the screen with your back)
       camera.position.set(me.x + Math.sin(look) * back, 16 + wanted * 0.42 * Math.max(0.9, zoom) + (wanted - back) * 0.75, me.y + Math.cos(look) * back);
-      camera.lookAt(me.x - Math.sin(look) * 14, 17, me.y - Math.cos(look) * 14);
+      camera.lookAt(me.x - Math.sin(look) * 14, 14, me.y - Math.cos(look) * 14);
     }
     // People
     mine.group.visible = mode !== "train" || trainTime > 4;        // (you step off the train once it has stopped)
