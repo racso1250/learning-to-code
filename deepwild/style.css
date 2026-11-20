@@ -149,7 +149,7 @@ a {
 
 #bag {
   right: 12px;
-  bottom: 12px;
+  bottom: 46px;
   max-width: 44%;
   text-align: right;
   color: #d8fff0;
@@ -315,4 +315,49 @@ button.big {
 
 .unknown {
   color: #6a8a9a;
+}
+
+#parts {
+  width: 70%;
+  max-height: 60%;
+  overflow-y: auto;
+}
+
+/* Your tools, along the bottom of the screen */
+#tools {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  font-size: 8px;
+  pointer-events: none;
+}
+
+#tools span {
+  padding: 6px 8px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(4, 20, 36, 0.7);
+  color: #bfe0ec;
+}
+
+#tools span.picked {
+  border-color: #ffe14a;
+  color: #fff6c8;
+  background: rgba(20, 60, 80, 0.9);
+}
+
+#room-actions button {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  font-size: 8px;
+  text-align: left;
+}
+
+#room-actions button:disabled {
+  opacity: 0.55;
+  border-color: #4a6a7a;
 }

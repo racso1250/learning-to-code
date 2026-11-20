@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Deepwild</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
-    <link rel="stylesheet" href="style.css?v=1">
+    <link rel="stylesheet" href="style.css?v=4">
   </head>
   <body>
     <h1>Deepwild</h1>
@@ -24,19 +24,27 @@
       <p id="depth"></p>
       <p id="compass"></p>
       <p id="bag"></p>
+      <div id="tools"></div>
       <div id="scan" hidden><div class="bar"><div id="scan-fill"></div></div><span id="scan-text"></span></div>
       <p id="toast" hidden></p>
       <p id="prompt" hidden></p>
 
       <!-- On the raft: make things, rest, read your journal, and dive back in -->
       <div id="raft" class="panel" hidden>
-        <h2>Your raft</h2>
+        <h2 id="home-title">Your raft</h2>
         <p class="small" id="bag-list"></p>
         <button id="dive" class="big">Dive in!</button>
         <button id="rest">Rest until morning</button>
         <button id="journal-button">Sea journal</button>
+        <div id="room-actions"></div>
         <h2>Make new gear</h2>
         <div id="recipes"></div>
+      </div>
+      <div id="build" class="overlay" hidden>
+        <h2>Build your base</h2>
+        <p class="small">Pick a piece, then point at the sea bed in front of you and press E. Press X next to a piece to pack it up again (you get everything back).</p>
+        <div id="parts"></div>
+        <button id="build-close">Close</button>
       </div>
       <div id="journal" class="overlay" hidden>
         <h2>Sea journal</h2>
@@ -49,8 +57,8 @@
       </div>
       <div id="intro" class="overlay">
         <h2 class="logo">Deepwild</h2>
-        <p>You live on a little raft in the middle of the sea. Dive down and explore: sunny shallows, a kelp forest, coral gardens, a twilight slope and a dark trench. Watch your air, make better gear, scan the creatures, and find the secret at the bottom of the sea.</p>
-        <p class="keys">Mouse (click the game first) or left and right arrows: look &nbsp; W, A, S, D: swim<br>Space: swim up &nbsp; C: swim down &nbsp; Shift: zoom (with the Zipfin scooter)<br>E: pick up, use, climb &nbsp; F: torch &nbsp; Right mouse button or Q: scan a creature &nbsp; J: sea journal</p>
+        <p>You live on a little raft in the middle of the sea. Dive down and explore ten parts of the sea, from sunny shallows to the Abyss. Watch your air, make better gear, build your own base on the sea bed, scan the creatures, steer clear of the leviathans, and find the secret at the bottom of the sea.</p>
+        <p class="keys">Mouse (click the game first) or left and right arrows: look &nbsp; W, A, S, D: swim<br>Space: swim up &nbsp; C: swim down &nbsp; Shift: zoom (with the Zipfin scooter)<br>Inside your base you stand and walk: W, A, S, D walk, Shift runs, Space jumps (or climbs a lookout's ladder)<br>1 to 4 or mouse wheel: choose a tool (Hands, Scanner, Net, Builder) &nbsp; Left click: use it<br>E: pick up, use, climb &nbsp; T: torch &nbsp; G: eat a cooked fish &nbsp; J: sea journal<br>B: build your base &nbsp; X: pack a piece up &nbsp; R: sea whistle</p>
         <button id="continue" hidden>Continue</button>
         <button id="start">New game</button>
       </div>
@@ -61,8 +69,8 @@
     <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="../sounds.js"></script>
-    <script src="world.js?v=1"></script>
-    <script src="game.js?v=1"></script>
+    <script src="world.js?v=4"></script>
+    <script src="game.js?v=6"></script>
     <script src="../fullscreen.js"></script>
   </body>
 </html>
