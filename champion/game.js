@@ -26,9 +26,9 @@ const sfx = {
 // ----- Outfits: everything you can choose in the outfit designer -----
 const OUTFIT = {
   skin: ["#f6d3b0", "#f2c79a", "#dba878", "#b9805a", "#8a5a3a", "#5c3b28"],
-  hairStyle: ["short", "long", "ponytail", "spiky", "bun", "bald"],
+  hairStyle: ["short", "long", "ponytail", "spiky", "bun", "curly", "bald"],
   hair: ["#2b2118", "#4a3020", "#7a4a26", "#c8a04a", "#e8d8a0", "#d8483a", "#3ab8e8", "#e870b0", "#8a5ad0", "#e8e8f0"],
-  hat: ["none", "cap", "beanie"],
+  hat: ["none", "cap", "beanie", "straw hat"],
   hatColour: ["#e0503a", "#3a6ad8", "#2a2c36", "#ffd84a", "#3aa858", "#ffffff", "#e870b0"],
   topStyle: ["T-shirt", "hoodie", "jacket"],
   top: ["#e0503a", "#3a6ad8", "#3aa858", "#ffd84a", "#ffffff", "#2a2c36", "#e870b0", "#8a5ad0", "#ff9a3a", "#3ab8c8"],

@@ -68,124 +68,200 @@ const VIEW = (function () {
   }
 
   // ----- People -----
-  // A person about 30 units tall, with proper proportions: legs with knees, arms with elbows, shoulders, a neck and a face.
+  // Everyone is built from smooth, rounded shapes: a body turned like clay on a wheel, arms and legs that taper,
+  // and a head with a proper face (eyes that blink, eyebrows, a nose, rosy cheeks and a smile).
   const PERSON = 0.76;         // how big people are (1 would make them tower over the cars)
+  const madeShapes = new Map();          // every shape is made once and shared by all the people
+  const shapeFor = (name, make) => madeShapes.get(name) || madeShapes.set(name, make()).get(name);
+  const ballShape = (r, wide, high) => shapeFor("ball" + r + "," + (wide || 14) + "," + (high || 10), () => new THREE.SphereGeometry(r, wide || 14, high || 10));
+  const tubeShape = (top, bottom, long) => shapeFor("tube" + top + "," + bottom + "," + long, () => new THREE.CylinderGeometry(top, bottom, long, 14));
+  const boxShape = (w, h, d) => shapeFor("box" + w + "," + h + "," + d, () => new THREE.BoxGeometry(w, h, d));
+  // A shape turned on a wheel: "points" go up the outside (how far out, how high). "flat" squashes it front to back.
+  const turned = (name, points, flat) => shapeFor(name, function () {
+    const shape = new THREE.LatheGeometry(points.map(([out, high]) => new THREE.Vector2(out, high)), 22);
+    shape.scale(1, 1, flat);
+    return shape;
+  });
+  const EYE_COLOURS = [0x5a3a22, 0x3a6ab8, 0x3a8a5a, 0x7a5a32];
+  const blackPaint = new THREE.MeshBasicMaterial({ color: 0x1a1418 }), shinePaint = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const blushPaint = new THREE.MeshBasicMaterial({ color: 0xff7a7a, transparent: true, opacity: 0.3, depthWrite: false });
   function makeHuman() {
     const group = new THREE.Group();          // where the person stands, and which way they face
     group.scale.setScalar(PERSON);
     const body = new THREE.Group();           // the whole body: it bobs up and down and leans as they move
     const hips = new THREE.Group();           // the hips and legs
     const torso = new THREE.Group();          // everything above the waist: it twists the opposite way to the hips
-    hips.position.y = 15.2;
-    torso.position.y = 16.6;
-    body.add(hips);
-    body.add(torso);
+    hips.position.y = 14.4;
+    torso.position.y = 16;
+    body.add(hips, torso);
     group.add(body);
     const m = {};
-    for (const part of ["skin", "hair", "top", "bottom", "shoes", "hat", "trim"]) m[part] = new THREE.MeshLambertMaterial({ color: 0xffffff });
-    const dark = paint(0x2a2230), white = paint(0xffffff);
-    const limb = (rTop, rBottom, long, mat, parent) => add(new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBottom, long, 12), mat), 0, -long / 2, 0, parent);
-    const joint = (r, mat, y, parent) => add(new THREE.Mesh(new THREE.SphereGeometry(r, 12, 9), mat), 0, y, 0, parent);
-    const legs = [], knees = [], ankles = [], arms = [], elbows = [], thighs = [], shins = [], calves = [], forearms = [];
+    for (const name of ["skin", "hair", "top", "bottom", "shoes", "hat", "trim", "eyes"]) m[name] = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    m.hair.side = THREE.DoubleSide;
+    const dark = paint(0x2a2230), white = paint(0xffffff), straw = paint(0xe8cc7a), lips = paint(0xa8444a);
+    // Put one piece on the body. Big pieces cast shadows; tiny ones (like eyes) don't need to.
+    const piece = function (shape, material, x, y, z, parent, shadow) {
+      const mesh = new THREE.Mesh(shape, material);
+      mesh.position.set(x, y, z);
+      mesh.castShadow = shadow !== false;
+      mesh.receiveShadow = shadow !== false;
+      parent.add(mesh);
+      return mesh;
+    };
+    const limb = (top, bottom, long, material, parent) => piece(tubeShape(top, bottom, long), material, 0, -long / 2, 0, parent);
+    const legs = [], knees = [], ankles = [], arms = [], elbows = [];
+    const bare = { arms: [], sleeves: [], cuffs: [], shins: [], thighs: [], shortLegs: [], socks: [] };       // pieces that change with your clothes
     for (const side of [-1, 1]) {
-      const leg = new THREE.Group();                      // swings from the hip
-      leg.position.set(side * 2.05, 0, 0);
-      thighs.push(limb(2.2, 1.7, 7.2, m.bottom, leg));    // a strong thigh
-      const knee = new THREE.Group();                     // bends at the knee
-      knee.position.y = -7.2;
-      joint(1.66, m.bottom, 0, knee);
-      shins.push(limb(1.6, 1.1, 6.6, m.bottom, knee));
-      const calf = add(new THREE.Mesh(new THREE.SphereGeometry(1.5, 10, 8), m.bottom), 0, -2.3, -0.5, knee);      // the calf muscle
-      calf.scale.set(0.95, 1.7, 1);
-      calves.push(calf);
-      const ankle = new THREE.Group();                    // tips the foot, so it stays flat on the ground
-      ankle.position.y = -6.6;
-      const shoe = add(new THREE.Mesh(new THREE.SphereGeometry(1.5, 12, 8), m.shoes), 0, -0.35, 1.2, ankle);
-      shoe.scale.set(1.05, 0.75, 2.05);
-      box(2.6, 0.4, 5.4, dark, 0, -1.15, 1.2, ankle);     // the sole
+      // A leg: thigh, knee, shin (with a calf muscle), ankle and shoe
+      const leg = new THREE.Group();
+      leg.position.set(side * 1.95, 0, 0);
+      bare.thighs.push(limb(2.15, 1.7, 6.8, m.bottom, leg));
+      bare.shortLegs.push(piece(tubeShape(2.3, 2.38, 3.9), m.bottom, 0, -2.1, 0, leg));
+      const knee = new THREE.Group();
+      knee.position.y = -6.8;
+      bare.shins.push(piece(ballShape(1.7), m.bottom, 0, 0, 0, knee));
+      bare.shins.push(limb(1.7, 1.12, 6.3, m.bottom, knee));
+      const calf = piece(ballShape(1.5), m.bottom, 0, -2.4, -0.42, knee);
+      calf.scale.set(0.92, 1.7, 1);
+      bare.shins.push(calf);
+      const ankle = new THREE.Group();
+      ankle.position.y = -6.3;
+      bare.socks.push(piece(tubeShape(1.3, 1.22, 1.3), white, 0, 0.45, 0, ankle, false));
+      piece(ballShape(1.5), m.shoes, 0, -0.42, 1.25, ankle).scale.set(1.08, 0.8, 2.1);       // the front of the shoe
+      piece(ballShape(1.35), m.shoes, 0, -0.38, -0.2, ankle).scale.set(1.02, 0.95, 1.05);    // the heel
+      piece(boxShape(3, 0.24, 6), white, 0, -0.82, 1.05, ankle, false);                      // a white stripe round the sole
+      piece(boxShape(2.9, 0.42, 5.9), dark, 0, -1.09, 1.05, ankle, false);                   // the sole
       knee.add(ankle);
       leg.add(knee);
       hips.add(leg);
       legs.push(leg);
       knees.push(knee);
       ankles.push(ankle);
-      const arm = new THREE.Group();                      // swings from the shoulder
-      arm.position.set(side * 5.05, 7.2, 0);
-      joint(1.8, m.top, 0, arm);
-      limb(1.55, 1.25, 5.5, m.top, arm);
-      const elbow = new THREE.Group();
-      elbow.position.y = -5.5;
-      joint(1.25, m.top, 0, elbow);
-      forearms.push(limb(1.25, 0.92, 5, m.top, elbow));
-      const hand = add(new THREE.Mesh(new THREE.SphereGeometry(1.15, 10, 8), m.skin), 0, -5.8, 0.1, elbow);
-      hand.scale.set(0.82, 1.25, 0.6);
-      arm.add(elbow);
+      // An arm: shoulder, upper arm (with a sleeve), elbow, forearm (with a cuff) and a hand with a thumb
+      const arm = new THREE.Group();
+      arm.position.set(side * 4.4, 6.45, 0);
       arm.userData.side = side;
+      piece(ballShape(1.6), m.top, 0, 0, 0, arm);
+      bare.arms.push(limb(1.42, 1.2, 5.4, m.top, arm));
+      bare.sleeves.push(piece(tubeShape(1.62, 1.6, 2.9), m.top, 0, -1.5, 0, arm));
+      const elbow = new THREE.Group();
+      elbow.position.y = -5.4;
+      bare.arms.push(piece(ballShape(1.2), m.top, 0, 0, 0, elbow));
+      bare.arms.push(limb(1.2, 0.9, 4.9, m.top, elbow));
+      bare.cuffs.push(piece(tubeShape(1.04, 1.04, 0.9), m.trim, 0, -4.5, 0, elbow, false));
+      piece(ballShape(1.12), m.skin, 0, -5.75, 0.05, elbow).scale.set(0.85, 1.2, 0.62);       // the hand...
+      piece(ballShape(0.45, 8, 6), m.skin, -side * 0.72, -5.3, 0.45, elbow, false).scale.set(1, 1.5, 1);      // ...and its thumb
+      arm.add(elbow);
       torso.add(arm);
       arms.push(arm);
       elbows.push(elbow);
     }
-    const pelvis = add(new THREE.Mesh(new THREE.SphereGeometry(3.7, 14, 10), m.bottom), 0, 0.3, 0, hips);
-    pelvis.scale.set(1.14, 0.8, 0.84);
-    const skirt = add(new THREE.Mesh(new THREE.CylinderGeometry(3.6, 5.4, 5.4, 14), m.bottom), 0, -2, 0, hips);
-    skirt.scale.z = 0.85;
-    const chest = add(new THREE.Mesh(new THREE.CylinderGeometry(4.4, 3.5, 8.6, 16), m.top), 0, 3.7, 0, torso);
-    chest.scale.z = 0.74;
-    const shoulders = add(new THREE.Mesh(new THREE.SphereGeometry(4.4, 14, 8), m.top), 0, 7.9, 0, torso);
-    shoulders.scale.set(1.07, 0.42, 0.72);
-    const zip = box(0.8, 8.4, 0.3, m.trim, 0, 3.8, 3.05, torso);          // a jacket's zip and collar
-    zip.rotation.x = -0.07;
-    const collar = add(new THREE.Mesh(new THREE.CylinderGeometry(1.9, 2.9, 1.5, 12), m.trim), 0, 8.4, 0, torso);
-    const hood = add(new THREE.Mesh(new THREE.SphereGeometry(2.8, 12, 8), m.top), 0, 8.4, -2.1, torso);
-    hood.scale.set(1.3, 0.75, 0.9);
-    tube(1.2, 1.35, 1.9, m.skin, 0, 8.9, 0, torso);                       // the neck
-    const head = new THREE.Group();
-    head.position.y = 11.5;
-    head.scale.setScalar(1.06);
-    torso.add(head);
-    add(new THREE.Mesh(new THREE.SphereGeometry(2.35, 20, 16), m.skin), 0, 0.15, 0, head).scale.set(0.9, 1.06, 0.98);
-    add(new THREE.Mesh(new THREE.SphereGeometry(1.75, 14, 10), m.skin), 0, -1.05, 0.28, head).scale.set(0.92, 0.9, 0.95);      // the jaw and chin
+    piece(turned("pelvis", [[0.01, -1.5], [2.3, -1.35], [3.3, -0.5], [3.45, 0.5], [3.2, 1.9], [0.01, 2.2]], 0.68), m.bottom, 0, 0, 0, hips);
+    const skirt = piece(turned("skirt", [[5.6, -5.2], [4.9, -1.4], [4.25, 0.6], [3.5, 1.9]], 0.86), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), 0, 0, 0, hips);
+    // The body: a shirt that is wide at the shoulders, narrow at the waist and loose at the hem
+    const shirt = piece(turned("shirt", [[3.52, -1.9], [3.42, -0.6], [3.2, 1.2], [3.55, 3.6], [3.95, 5.9], [4, 6.9], [3.4, 7.9], [2, 8.5], [0.01, 8.6]], 0.74), m.top, 0, 0, 0, torso);
+    piece(tubeShape(1.1, 1.25, 2), m.skin, 0, 9.2, 0, torso);                                 // the neck
+    const neckline = piece(shapeFor("neckline", () => new THREE.TorusGeometry(1.5, 0.3, 6, 16)), m.trim, 0, 8.42, 0, torso, false);
+    neckline.rotation.x = Math.PI / 2;
+    const emblem = piece(shapeFor("emblem", () => new THREE.CircleGeometry(1.05, 5)), white, 0, 4.9, 3.03, torso, false);       // a little badge on a T-shirt
+    emblem.rotation.set(0.12, 0, Math.PI / 2);
+    const hoodie = new THREE.Group();          // a hood, a pocket on the front and two cords
+    piece(ballShape(2.7), m.top, 0, 8.2, -1.95, hoodie).scale.set(1.25, 0.8, 0.9);
+    piece(boxShape(4.4, 1.9, 0.36), m.trim, 0, 0.3, 2.34, hoodie, false);
+    for (const side of [-1, 1]) piece(tubeShape(0.14, 0.14, 2.6), white, side * 0.75, 6.2, 3.06, hoodie, false).rotation.x = 0.06;
+    const jacket = new THREE.Group();          // a zip, a collar and two pockets
+    piece(boxShape(0.5, 5.4, 0.3), m.trim, 0, 4, 2.76, jacket, false).rotation.x = 0.145;
     for (const side of [-1, 1]) {
-      const eye = add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), white), side * 0.82, 0.2, 1.92, head);
-      eye.scale.set(1.15, 0.8, 0.5);
-      eye.castShadow = false;
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 6), dark), side * 0.82, 0.2, 2.1, head).castShadow = false;
-      box(0.95, 0.17, 0.2, m.hair, side * 0.84, 0.82, 2.08, head).castShadow = false;       // eyebrows
-      add(new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), m.skin), side * 2.08, -0.05, 0, head).scale.set(0.5, 1, 0.8);      // ears
+      piece(boxShape(1.9, 0.3, 0.3), m.trim, side * 1.9, 0.3, 2.42, jacket, false);
+      const lapel = piece(boxShape(1.5, 0.5, 2.2), m.trim, side * 1.25, 8.25, 1.4, jacket, false);
+      lapel.rotation.set(0.5, side * 0.5, 0);
     }
-    const nose = add(new THREE.Mesh(new THREE.ConeGeometry(0.34, 0.95, 6), m.skin), 0, -0.3, 2.32, head);
-    nose.rotation.x = 1.25;
-    nose.castShadow = false;
-    box(1, 0.15, 0.15, paint(0xb8504a), 0, -1.12, 2.02, head).castShadow = false;           // mouth
+    torso.add(hoodie, jacket);
+    // The head, and the face on the front of it
+    const head = new THREE.Group();
+    head.position.y = 12.3;
+    torso.add(head);
+    piece(ballShape(3, 24, 18), m.skin, 0, 0, 0, head).scale.set(0.94, 1, 0.96);
+    piece(ballShape(2.2, 16, 12), m.skin, 0, -1.35, 0.3, head).scale.set(0.93, 0.9, 0.95);        // the jaw and chin
+    const eyes = [];
+    for (const side of [-1, 1]) {
+      piece(ballShape(0.62, 10, 8), m.skin, side * 2.78, -0.2, -0.1, head, false).scale.set(0.5, 1, 0.8);       // an ear
+      const eye = new THREE.Group();
+      eye.position.set(side * 1.12, 0.1, 2.52);
+      piece(ballShape(0.66, 12, 10), shinePaint, 0, 0, 0, eye, false).scale.set(1, 1.18, 0.45);
+      piece(ballShape(0.4, 10, 8), m.eyes, 0, -0.04, 0.2, eye, false).scale.set(1, 1.1, 0.4);
+      piece(ballShape(0.21, 8, 6), blackPaint, 0, -0.04, 0.31, eye, false).scale.z = 0.4;
+      piece(ballShape(0.1, 6, 4), shinePaint, 0.15, 0.2, 0.39, eye, false);                     // a tiny sparkle
+      head.add(eye);
+      eyes.push(eye);
+      piece(boxShape(1.36, 0.15, 0.3), blackPaint, side * 1.12, 0.9, 2.6, head, false).rotation.z = -side * 0.06;     // eyelashes
+      const brow = piece(boxShape(1.3, 0.22, 0.3), m.hair, side * 1.15, 1.42, 2.5, head, false);
+      brow.rotation.set(0, side * 0.3, -side * 0.12);
+      const cheek = piece(shapeFor("cheek", () => new THREE.CircleGeometry(0.58, 12)), blushPaint, side * 1.86, -0.78, 2.36, head, false);
+      cheek.rotation.y = side * 0.62;
+    }
+    piece(ballShape(0.42, 8, 6), m.skin, 0, -0.55, 2.93, head, false).scale.set(0.9, 0.8, 1);     // the nose
+    const smile = piece(shapeFor("smile", () => new THREE.TorusGeometry(0.8, 0.1, 6, 14, Math.PI)), lips, 0, -1.2, 2.44, head, false);
+    smile.rotation.set(-0.12, 0, Math.PI);
+    // Hair. Most styles start with a cap of hair over the top and back of the head.
     const cap = function (parent) {
-      const top = add(new THREE.Mesh(new THREE.SphereGeometry(2.55, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), m.hair), 0, 0.3, -0.22, parent);
-      top.scale.set(0.94, 1.06, 1.04);
-      box(3.6, 0.9, 0.5, m.hair, 0, 1.75, 1.95, parent).rotation.x = -0.5;                  // a fringe
+      const top = piece(shapeFor("hairTop", () => new THREE.SphereGeometry(3.2, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5)), m.hair, 0, 0, 0, parent);
+      top.scale.set(0.96, 1, 0.98);
+      top.rotation.x = -0.3;
+      piece(shapeFor("hairBack", () => new THREE.SphereGeometry(3.18, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.5)), m.hair, 0, 0, 0, parent).rotation.x = -1.25;
     };
-    const styles = { short: new THREE.Group(), long: new THREE.Group(), ponytail: new THREE.Group(), spiky: new THREE.Group(), bun: new THREE.Group(), bald: new THREE.Group() };
-    for (const style of ["short", "long", "ponytail", "spiky", "bun"]) cap(styles[style]);
-    const curtain = add(new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.9, 7.4, 12, 1, true, Math.PI * 0.55, Math.PI * 0.9), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide })), 0, -3, -0.1, styles.long);
-    curtain.material = m.hair;
-    m.hair.side = THREE.DoubleSide;
-    const tail = add(new THREE.Mesh(new THREE.ConeGeometry(0.95, 6, 8), m.hair), 0, -1.6, -2.9, styles.ponytail);
-    tail.rotation.x = Math.PI + 0.25;
-    ball(0.75, m.hair, 0, 1.3, -2.5, styles.ponytail);
-    for (let i = 0; i < 9; i++) {
-      const a = i * 0.7, r = i === 8 ? 0 : 1.5;
-      const spike = add(new THREE.Mesh(new THREE.ConeGeometry(0.75, 2.4, 6), m.hair), Math.cos(a) * r, 2.9, Math.sin(a) * r - 0.2, styles.spiky);
-      spike.rotation.set(Math.sin(a) * 0.5 * (r ? 1 : 0), 0, -Math.cos(a) * 0.5 * (r ? 1 : 0));
-    }
-    ball(1.35, m.hair, 0, 2.6, -1.5, styles.bun);
-    for (const style in styles) head.add(styles[style]);
-    const hats = { none: new THREE.Group(), cap: new THREE.Group(), beanie: new THREE.Group() };
-    tube(2.6, 2.7, 1.5, m.hat, 0, 1.9, -0.2, hats.cap);
-    box(3.6, 0.3, 2.6, m.hat, 0, 1.35, 2.7, hats.cap);
-    add(new THREE.Mesh(new THREE.SphereGeometry(2.72, 14, 9, 0, Math.PI * 2, 0, Math.PI * 0.5), m.hat), 0, 0.75, -0.2, hats.beanie);
-    tube(2.78, 2.78, 0.8, m.trim, 0, 0.95, -0.2, hats.beanie);
-    ball(0.7, m.trim, 0, 3.7, -0.2, hats.beanie);
-    for (const hat in hats) head.add(hats[hat]);
+    const fringe = function (parent) {          // three soft tufts across the forehead, and a little hair in front of each ear
+      for (const [x, y, z, tilt] of [[-1.35, 1.72, 2.4, 0.3], [0.1, 1.98, 2.62, 0.05], [1.45, 1.68, 2.36, -0.3]]) {
+        const tuft = piece(ballShape(1.25, 10, 8), m.hair, x, y, z, parent, false);
+        tuft.scale.set(1.25, 0.55, 0.8);
+        tuft.rotation.z = tilt;
+      }
+      for (const side of [-1, 1]) piece(ballShape(0.6, 8, 6), m.hair, side * 2.62, 0.5, 0.95, parent, false).scale.set(0.5, 1.3, 0.9);
+    };
+    const outward = function (shape, parent, polar, round, far) {          // put a shape on the head, pointing straight out from the middle of it
+      const way = new THREE.Vector3(Math.sin(polar) * Math.sin(round), Math.cos(polar), Math.sin(polar) * Math.cos(round));
+      const mesh = piece(shape, m.hair, way.x * far, way.y * far, way.z * far, parent, false);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), way);
+      return mesh;
+    };
+    const styles = {};
+    for (const style of ["short", "long", "ponytail", "spiky", "bun", "curly", "bald"]) head.add((styles[style] = new THREE.Group()));
+    for (const style of ["short", "long", "ponytail", "spiky", "bun", "curly"]) cap(styles[style]);
+    for (const style of ["short", "long", "ponytail", "bun"]) fringe(styles[style]);
+    piece(shapeFor("hairLong", () => new THREE.CylinderGeometry(3.3, 3.7, 8.2, 18, 1, true, Math.PI - 1.75, 3.5)), m.hair, 0, -3.6, 0, styles.long);
+    for (const side of [-1, 1]) piece(ballShape(0.8, 8, 8), m.hair, side * 2.75, -2.5, 0.9, styles.long, false).scale.set(0.75, 3.6, 1.3);
+    piece(ballShape(0.9), m.hair, 0, 1.6, -3.05, styles.ponytail, false);
+    const tail = piece(shapeFor("ponytail", () => new THREE.ConeGeometry(1.2, 7.2, 10)), m.hair, 0, -2, -3.8, styles.ponytail);
+    tail.rotation.x = Math.PI + 0.2;
+    const spike = shapeFor("spike", () => new THREE.ConeGeometry(1, 3, 7));
+    outward(spike, styles.spiky, 0, 0, 3.9);
+    for (let k = 0; k < 6; k++) outward(spike, styles.spiky, 0.62, k * 1.047 + 0.5, 3.9);
+    for (let k = 0; k < 9; k++) if (Math.abs(Math.atan2(Math.sin(k * 0.698), Math.cos(k * 0.698))) > 0.95) outward(spike, styles.spiky, 1.15, k * 0.698, 3.8);
+    piece(ballShape(1.65), m.hair, 0, 3.15, -1.6, styles.bun);
+    const curl = ballShape(1.3, 10, 8);
+    outward(curl, styles.curly, 0, 0, 3.3);
+    for (let k = 0; k < 7; k++) outward(curl, styles.curly, 0.6, k * 0.898, 3.3);
+    for (let k = 0; k < 10; k++) if (Math.abs(Math.atan2(Math.sin(k * 0.628), Math.cos(k * 0.628))) > 0.75) outward(curl, styles.curly, 1.15, k * 0.628, 3.25);
+    for (let k = 0; k < 8; k++) if (Math.abs(Math.atan2(Math.sin(k * 0.785), Math.cos(k * 0.785))) > 1.5) outward(curl, styles.curly, 1.7, k * 0.785, 3.1);
+    // Hats
+    const hats = {};
+    for (const hat of ["none", "cap", "beanie", "straw hat"]) head.add((hats[hat] = new THREE.Group()));
+    const dome = shapeFor("hatDome", () => new THREE.SphereGeometry(3.36, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5));
+    piece(dome, m.hat, 0, 0.7, -0.1, hats.cap).scale.set(0.97, 0.84, 1);
+    piece(boxShape(4.6, 0.3, 3), m.hat, 0, 1, 3.55, hats.cap).rotation.x = 0.14;                  // the peak
+    piece(ballShape(0.36, 8, 6), m.trim, 0, 3.55, -0.1, hats.cap, false);
+    hats.cap.rotation.x = -0.12;
+    piece(dome, m.hat, 0, 0.55, 0, hats.beanie);
+    piece(shapeFor("beanieRim", () => new THREE.TorusGeometry(3.24, 0.52, 8, 20)), m.trim, 0, 0.65, 0, hats.beanie).rotation.x = Math.PI / 2;
+    piece(ballShape(0.9), m.trim, 0, 4.1, 0, hats.beanie, false);
+    hats.beanie.rotation.x = -0.14;
+    piece(tubeShape(5.7, 5.7, 0.35), straw, 0, 1.3, 0, hats["straw hat"]);                         // a wide brim to keep the sun off
+    piece(tubeShape(2.9, 3.25, 2.5), straw, 0, 2.6, 0, hats["straw hat"]);
+    piece(tubeShape(3.3, 3.32, 0.75), m.hat, 0, 1.85, 0, hats["straw hat"], false);                // a ribbon in your hat colour
+    hats["straw hat"].rotation.x = -0.1;
     let wearing = "";
     let go = 0, fast = 0;          // how much they are walking (0 to 1), and how much of that is running (0 to 1)
+    const blinkAt = Math.random() * 5;          // (so that everyone blinks at different moments)
     return {
       group: group,
       // Change the colours and shapes to match an outfit (a list of choices from OUTFIT in game.js)
@@ -196,21 +272,26 @@ const VIEW = (function () {
         const pick = (part) => OUTFIT[part][outfit[part] % OUTFIT[part].length];
         for (const part of ["skin", "hair", "top", "bottom", "shoes"]) m[part].color.set(pick(part));
         m.hat.color.set(pick("hatColour"));
-        m.trim.color.set(pick("top")).multiplyScalar(0.6);
+        m.trim.color.set(pick("top")).multiplyScalar(0.62);
+        m.eyes.color.set(EYE_COLOURS[(outfit.hair + outfit.skin) % EYE_COLOURS.length]);
+        skirt.material.color.set(pick("bottom"));
         const top = pick("topStyle"), bottom = pick("bottomStyle"), hat = pick("hat");
         let hair = pick("hairStyle");
-        if (hat !== "none" && (hair === "spiky" || hair === "bun")) hair = "short";       // (these don't fit under a hat)
+        if (hat !== "none" && (hair === "spiky" || hair === "bun" || hair === "curly")) hair = "short";       // (these don't fit under a hat)
         for (const style in styles) styles[style].visible = style === hair;
         for (const each in hats) hats[each].visible = each === hat;
-        zip.visible = collar.visible = top === "jacket";
-        hood.visible = top === "hoodie";
+        const shortSleeves = top === "T-shirt";
+        hoodie.visible = top === "hoodie";
+        jacket.visible = top === "jacket";
+        emblem.visible = shortSleeves;
+        neckline.visible = top !== "hoodie";
+        for (const each of bare.arms) each.material = shortSleeves ? m.skin : m.top;
+        for (const each of bare.cuffs) each.visible = !shortSleeves;
         skirt.visible = bottom === "skirt";
-        for (const forearm of forearms) forearm.material = top === "T-shirt" ? m.skin : m.top;
-        for (const elbow of elbows) elbow.children[0].material = top === "T-shirt" ? m.skin : m.top;
-        for (const shin of shins) shin.material = bottom === "trousers" ? m.bottom : m.skin;
-        for (const calf of calves) calf.material = bottom === "trousers" ? m.bottom : m.skin;
-        for (const thigh of thighs) thigh.material = bottom === "skirt" ? m.skin : m.bottom;
-        for (const knee of knees) knee.children[0].material = bottom === "trousers" ? m.bottom : m.skin;
+        for (const each of bare.shins) each.material = bottom === "trousers" ? m.bottom : m.skin;
+        for (const each of bare.thighs) each.material = bottom === "skirt" ? m.skin : m.bottom;
+        for (const each of bare.shortLegs) each.visible = bottom === "shorts";
+        for (const each of bare.socks) each.visible = bottom !== "trousers";
       },
       // Stand at a place, face a way, and walk or run. "step" counts up as they move: one full turn of it (6.28) is two steps.
       // A real walk is copied here: each leg swings forward with its knee bent, lands, and pushes back with the foot flat;
@@ -239,9 +320,11 @@ const VIEW = (function () {
         hips.rotation.z = twist * mix(0.035, 0.02);
         torso.rotation.y = -twist * mix(0.15, 0.26);
         torso.rotation.x = mix(0.02, 0.1);
-        head.rotation.y = twist * mix(0.06, 0.1);
+        head.rotation.y = twist * mix(0.06, 0.1) + Math.sin(now * 0.5 + blinkAt) * 0.12 * still;        // (standing still, they look about a little)
         head.rotation.x = -mix(0.04, 0.2) + Math.sin(now * 0.9 + x) * 0.03 * still;
-        chest.scale.x = 1 + Math.sin(now * 1.7) * 0.012 * still;            // breathing, when standing still
+        shirt.scale.x = 1 + Math.sin(now * 1.7) * 0.012 * still;                           // breathing, when standing still
+        const blink = (now + blinkAt) % 4.4 < 0.13 ? 0.12 : 1;
+        for (const eye of eyes) eye.scale.y = blink;
         body.rotation.x = lean;
         // walking: highest when one leg is straight under you. Running: highest in mid-air, between steps.
         body.position.set(twist * mix(0.3, 0.15), go * ((1 - fast) * (Math.cos(step * 2) * 0.35 - 0.3) + fast * (0.5 - Math.cos(step * 2) * 0.9)), 0);
