@@ -1,6 +1,6 @@
 // Deepwild: the game.
-// You live on a little raft in the middle of the sea. Dive down to explore: watch your air, pick up useful things,
-// climb back onto the raft to make better gear, scan the creatures you meet, and find the four Tide Tablets
+// You live in a little floating pod in the middle of the sea. Dive down to explore: watch your air, pick up useful things,
+// climb back into the pod to make better gear, scan the creatures you meet, and find the four Tide Tablets
 // that open the Great Shell at the very bottom of the Trench. The sea itself is described in world.js.
 
 const el = (id) => document.getElementById(id);
@@ -51,13 +51,22 @@ torch.target.position.set(0, 0, -6);
 camera.add(torch, torch.target);
 scene.add(skyLight, sunLight);
 const clock = { value: 0 };             // seconds since the game began (shared with the tiny graphics programs below)
+const nightGlow = { value: 0 };         // how strongly the corals and anemones glow: nothing by day, bright at night
+// Make a paint glow with its own colour at night
+function glowAtNight(material) {
+  material.onBeforeCompile = function (shader) {
+    shader.uniforms.nightGlow = nightGlow;
+    shader.fragmentShader = "uniform float nightGlow;\n" + shader.fragmentShader.replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n  totalEmissiveRadiance += vColor * nightGlow;");
+  };
+  return material;
+}
 
 // ----- The sea bed -----
 // One big sheet of points, each pushed down to the depth of the sea at that place and coloured like the ground there.
 // A tiny program for the graphics card (a "shader") lights it, and draws the wobbly lines of sunlight you see in shallow water.
 const baseLight = new THREE.PointLight(0xfff0c0, 0, 40, 1.4);          // (the light of the sea lamp or base room nearest to you)
 scene.add(baseLight);
-const seaBed = { uniforms: { lampAt: { value: new THREE.Vector3() }, lampOn: { value: 0 }, time: clock, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0.02 }, light: { value: 0.8 }, sun: { value: 0.6 }, torchAt: { value: new THREE.Vector3() }, torchWay: { value: new THREE.Vector3(0, 0, -1) }, torchOn: { value: 0 } } };
+const seaBed = { uniforms: { lampAt: { value: new THREE.Vector3() }, lampOn: { value: 0 }, time: clock, fogColor: { value: new THREE.Color() }, fogDensity: { value: 0.02 }, light: { value: 0.8 }, sun: { value: 0.6 }, night: nightGlow, torchAt: { value: new THREE.Vector3() }, torchWay: { value: new THREE.Vector3(0, 0, -1) }, torchOn: { value: 0 } } };
 (function () {
   const cells = 300, size = (WORLD + 20) * 2, places = [], colours = [], shines = [], corners = [];
   for (let iz = 0; iz <= cells; iz++) for (let ix = 0; ix <= cells; ix++) {
@@ -110,22 +119,40 @@ const seaBed = { uniforms: { lampAt: { value: new THREE.Vector3() }, lampOn: { v
       uniform float torchOn;
       uniform vec3 lampAt;
       uniform float lampOn;
+      uniform float night;
       varying vec3 vColour;
       varying vec3 vUp;
       varying vec3 vPlace;
       varying float vFar;
       varying float vShine;
+      // (two little helpers that make a blotchy pattern out of nothing but a place)
+      float dots(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float blotch(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(dots(i), dots(i + vec2(1.0, 0.0)), f.x), mix(dots(i + vec2(0.0, 1.0)), dots(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
       void main() {
         float up = max(0.0, normalize(vUp).y);
+        float close = 1.0 - smoothstep(25.0, 90.0, vFar);       // (fine detail is only drawn near you)
         // Steep ground is bare grey rock; flatter ground is sand, with little ripples in it
         vec3 ground = mix(vColour * vec3(0.62, 0.64, 0.7), vColour, smoothstep(0.72, 0.9, up));
         ground *= 0.93 + 0.07 * sin(vPlace.x * 2.3 + sin(vPlace.z * 1.9) * 1.6);
+        // Grainy sand and pebbles close up, and big soft patches of darker, mossy ground
+        ground *= mix(1.0, 0.8 + 0.4 * (blotch(vPlace.xz * 1.6) * 0.6 + blotch(vPlace.xz * 5.5) * 0.4), close);
+        ground = mix(ground, ground * vec3(0.62, 0.86, 0.7), smoothstep(0.5, 0.78, blotch(vPlace.xz * 0.09)) * 0.55);
         vec3 colour = ground * (light * 0.62 + sun * (0.2 + 0.4 * up));
         colour += vColour * vShine * (0.8 + 0.2 * sin(time * 2.0 + vPlace.x * 0.7 + vPlace.z * 0.5));
         // Wobbly lines of sunlight on the sand (they fade away as the water gets deeper)
         vec2 p = vPlace.xz * 0.4;
         float lines = sin(p.x + sin(p.y * 1.3 + time * 0.9) * 1.7 + time * 0.5) * sin(p.y * 1.1 + sin(p.x * 1.2 - time * 0.7) * 1.7);
-        colour += vColour * pow(1.0 - abs(lines), 7.0) * sun * 0.75 * clamp(1.0 + vPlace.y / 50.0, 0.0, 1.0) * up;
+        vec2 q = vPlace.xz * 0.23 + 7.0;
+        float wide = sin(q.x + sin(q.y * 1.4 - time * 0.6) * 1.9 - time * 0.35) * sin(q.y * 1.2 + sin(q.x * 1.1 + time * 0.5) * 1.9);
+        colour += vColour * (pow(1.0 - abs(lines), 7.0) * 0.8 + pow(1.0 - abs(wide), 5.0) * 0.4) * sun * clamp(1.0 + vPlace.y / 60.0, 0.0, 1.0) * up;
+        // At night, tiny living lights twinkle on the sea bed
+        vec2 cell = floor(vPlace.xz * 1.3);
+        float speck = step(0.985, dots(cell)) * smoothstep(0.42, 0.1, distance(fract(vPlace.xz * 1.3), vec2(0.5)));
+        colour += vec3(0.3, 1.0, 0.85) * speck * night * 1.6 * close * (0.55 + 0.45 * sin(time * 2.0 + dots(cell + 3.0) * 40.0));
         // Your torch: a bright circle where you point it
         vec3 toHere = vPlace - torchAt;
         float far = length(toHere);
@@ -142,7 +169,7 @@ const seaBed = { uniforms: { lampAt: { value: new THREE.Vector3() }, lampOn: { v
 // ----- The top of the water, and the sky above it -----
 // (Seen from below, the surface is a sheet of rippling light. A tiny graphics program draws the ripples.)
 const surfacePaint = new THREE.ShaderMaterial({
-  uniforms: { time: clock, bright: { value: new THREE.Color(0xf0ffff) }, dull: { value: new THREE.Color(0x7ad8f0) }, see: { value: 0.6 }, eye: { value: new THREE.Vector3() }, reach: { value: 220 } },
+  uniforms: { time: clock, below: { value: 0 }, bright: { value: new THREE.Color(0xf0ffff) }, dull: { value: new THREE.Color(0x7ad8f0) }, see: { value: 0.6 }, eye: { value: new THREE.Vector3() }, reach: { value: 220 } },
   vertexShader: `
     varying vec2 vPlace;
     void main() {
@@ -157,11 +184,23 @@ const surfacePaint = new THREE.ShaderMaterial({
     uniform float see;
     uniform vec3 eye;
     uniform float reach;
+    uniform float below;
     varying vec2 vPlace;
     void main() {
       float waves = sin(vPlace.x * 0.5 + time * 1.2 + sin(vPlace.y * 0.37 + time * 0.6) * 2.0) * sin(vPlace.y * 0.45 - time + sin(vPlace.x * 0.31) * 2.0);
+      float fine = sin(vPlace.x * 1.9 - time * 1.6 + sin(vPlace.y * 1.3) * 1.5) * sin(vPlace.y * 2.1 + time * 1.3);
+      float ripple = smoothstep(0.1, 0.9, waves * 0.75 + fine * 0.25);
       float fade = 1.0 - smoothstep(reach * 0.3, reach, distance(vPlace, eye.xz));
-      gl_FragColor = vec4(mix(dull, bright, smoothstep(0.1, 0.9, waves)), see * fade);
+      vec3 colour = mix(dull, bright, ripple);
+      float alpha = see * fade;
+      if (below > 0.5) {
+        // From under the water you only see the sky through a round window straight above you. Further out, the surface is a dark, wobbly mirror.
+        vec3 toHere = normalize(vec3(vPlace.x - eye.x, -eye.y, vPlace.y - eye.z));
+        float window = smoothstep(0.58, 0.74, toHere.y + waves * 0.06);
+        colour = mix(dull * (0.42 + 0.2 * ripple), colour, window) + bright * window * pow(ripple, 3.0) * 0.3;
+        alpha *= mix(0.8, 1.0, window);
+      } else colour += bright * pow(ripple, 6.0) * 0.5;        // (from above: glints of light on the waves)
+      gl_FragColor = vec4(colour, alpha);
     }`,
   transparent: true, side: THREE.DoubleSide, depthWrite: false,
 });
@@ -191,13 +230,24 @@ scene.add(waterBall);
 surface.rotation.x = -Math.PI / 2;
 scene.add(surface);
 const sunDisc = new THREE.Mesh(new THREE.CircleGeometry(26, 20), new THREE.MeshBasicMaterial({ color: 0xfff6c8, fog: false }));
-sunDisc.position.set(180, 420, 140);
-sunDisc.lookAt(0, 0, 0);
-scene.add(sunDisc);
+const moonDisc = new THREE.Mesh(new THREE.CircleGeometry(17, 20), new THREE.MeshBasicMaterial({ color: 0xe4ecff, fog: false }));
+const stars = (function () {
+  const spots = [];
+  for (let n = 0; n < 600; n++) {
+    const round = Math.random() * 6.283, up = 0.04 + Math.random() * 0.96, out = Math.sqrt(1 - up * up);
+    spots.push(Math.cos(round) * out * 600, up * 600, Math.sin(round) * out * 600);
+  }
+  const shape = new THREE.BufferGeometry();
+  shape.setAttribute("position", new THREE.Float32BufferAttribute(spots, 3));
+  const cloud = new THREE.Points(shape, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+  cloud.frustumCulled = false;
+  return cloud;
+})();
+scene.add(sunDisc, moonDisc, stars);
 // Beams of sunlight slanting down through the water near you
-const beams = Array.from({ length: 7 }, function (unused, n) {
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 4.5, 60, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xd8fff0, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-  beam.userData = { x: Math.cos(n * 0.9) * (8 + n * 4), z: Math.sin(n * 0.9) * (8 + n * 4) };
+const beams = Array.from({ length: 14 }, function (unused, n) {
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.8 + (n % 3) * 0.5, 3.5 + (n % 4) * 1.3, 76, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xd8fff0, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  beam.userData = { x: Math.cos(n * 2.4) * (7 + n * 3.2), z: Math.sin(n * 2.4) * (7 + n * 3.2) };
   beam.rotation.z = 0.22;
   scene.add(beam);
   return beam;
@@ -231,7 +281,7 @@ const motes = (function () {
 })();
 // Bubbles that rise from you as you breathe (and from the hot vents)
 const bubbles = Array.from({ length: 90 }, function () {
-  const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xe8fbff, transparent: true, opacity: 0.7 }));
+  const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xe8fbff, transparent: true, opacity: 0.45, depthWrite: false }));
   bubble.visible = false;
   bubble.userData = { life: 0, drift: 0 };
   scene.add(bubble);
@@ -241,7 +291,7 @@ const bubbles = Array.from({ length: 90 }, function () {
 // ----- Plants, rocks and things to pick up -----
 // There are thousands of these, so each kind is drawn in one go: the same shape copied to many places ("instancing").
 const paints = new Map();
-const paint = (colour) => paints.get(colour) || paints.set(colour, new THREE.MeshLambertMaterial({ color: colour })).get(colour);
+const paint = (colour) => paints.get(colour) || paints.set(colour, new THREE.MeshPhongMaterial({ color: colour, shininess: 26, specular: 0x243440 })).get(colour);       // (a little shiny, as wet things are)
 // Glue several simple shapes into one. Each part is [shape, x, y, z, turn about x, turn about z, stretch x, stretch y, stretch z].
 function glue(parts) {
   const places = [], ups = [];
@@ -284,6 +334,7 @@ function scatter(shape, material, list, colourOf, sizeOf, lift) {
       many.setMatrixAt(n, helper.matrix);
       many.setColorAt(n, colour.set(colourOf(at)));
       Object.assign(at, { mesh: many, slot: n, lift: up });       // (so a thing you pick up can be found and hidden again)
+      (at.drawn = at.drawn || []).push({ mesh: many, slot: n, lift: up, wide: wide, high: high });
     });
     many.frustumCulled = false;
     const [sx, sz] = name.split(",").map(Number);
@@ -311,8 +362,8 @@ kelpPaint.onBeforeCompile = function (shader) {
 };
 scatter(kelpShape, kelpPaint, decor.kelp, pickFrom([0x4a8a3a, 0x5a9a44, 0x6aa040, 0x3e7a34]), (at) => [1.3 * at.size, 9 * at.size]);
 scatter(glue([[STICK, 0, 0.7, 0, 0, 0, 0.22, 1.4, 0.22], [STICK, 0.45, 1, 0, 0, -0.7, 0.16, 1.1, 0.16], [STICK, -0.4, 1.1, 0.1, 0, 0.6, 0.16, 1.2, 0.16], [STICK, 0, 1.1, 0.45, 0.6, 0, 0.14, 1, 0.14], [BALL, 0, 1.5, 0, 0, 0, 0.3, 0.3, 0.3], [BALL, 0.85, 1.45, 0, 0, 0, 0.22, 0.22, 0.22], [BALL, -0.8, 1.6, 0.1, 0, 0, 0.22, 0.22, 0.22]]),
-  new THREE.MeshLambertMaterial({ color: 0xffffff }), decor.coral, pickFrom([0xff6a8a, 0xff9a4a, 0xffd84a, 0xc86af0, 0x4ad8c8, 0xff5ab0]), (at) => [1.5 * at.size, 1.5 * at.size]);
-scatter(glue([[new THREE.CircleGeometry(1, 14), 0, 1.4, 0], [STICK, 0, 0.3, 0, 0, 0, 0.08, 0.6, 0.08]]), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), decor.fan, pickFrom([0xe84a7a, 0xf0a03a, 0x8a5ae0, 0xe0e04a]), (at) => [1.3 * at.size, 1.3 * at.size]);
+  glowAtNight(new THREE.MeshLambertMaterial({ color: 0xffffff })), decor.coral, pickFrom([0xff6a8a, 0xff9a4a, 0xffd84a, 0xc86af0, 0x4ad8c8, 0xff5ab0]), (at) => [1.5 * at.size, 1.5 * at.size]);
+scatter(glue([[new THREE.CircleGeometry(1, 14), 0, 1.4, 0], [STICK, 0, 0.3, 0, 0, 0, 0.08, 0.6, 0.08]]), glowAtNight(new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide })), decor.fan, pickFrom([0xe84a7a, 0xf0a03a, 0x8a5ae0, 0xe0e04a]), (at) => [1.3 * at.size, 1.3 * at.size]);
 scatter(glue([[BALL, 0, 0.4, 0, 0, 0, 1.4, 0.9, 1.1], [LUMP, 0.9, 0.2, 0.4, 0, 0, 0.6, 0.5, 0.6]]), new THREE.MeshLambertMaterial({ color: 0xffffff }), decor.rock, pickFrom([0x7a7684, 0x8a8694, 0x6a6672, 0x7c8a7a]), (at) => [1.2 * at.size, 1.2 * at.size]);
 scatter(CONE, new THREE.MeshLambertMaterial({ color: 0xffffff }), decor.spire, pickFrom([0x2c2a3c, 0x34324a, 0x242232]), (at) => [2.4 * at.size, 10 * at.size], (at) => 5 * at.size);
 // Glow bulbs: plants that shine with their own light in the dark
@@ -320,9 +371,9 @@ scatter(glue([[BALL, 0, 1.2, 0, 0, 0, 0.45, 0.55, 0.45], [STICK, 0, 0.45, 0, 0, 
 // Sea grass (short blades that sway like the kelp), anemones, brain coral and table coral
 scatter(kelpShape, kelpPaint, decor.grass, pickFrom([0x7ac84a, 0x5ab040, 0x9ad85a]), (at) => [0.55 * at.size, 1.2 * at.size]);
 scatter(glue([[BALL, 0, 0.25, 0, 0, 0, 0.45, 0.3, 0.45]].concat([0, 1, 2, 3, 4, 5, 6, 7].map((k) => [STICK, Math.cos(k * 0.785) * 0.3, 0.75, Math.sin(k * 0.785) * 0.3, Math.sin(k * 0.785) * 0.5, -Math.cos(k * 0.785) * 0.5, 0.07, 0.8, 0.07]))),
-  new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x201018 }), decor.anemone, pickFrom([0xff7ab0, 0xffa04a, 0xc87aff, 0x7ae0d0]), (at) => [at.size, at.size]);
+  glowAtNight(new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x201018 })), decor.anemone, pickFrom([0xff7ab0, 0xffa04a, 0xc87aff, 0x7ae0d0]), (at) => [at.size, at.size]);
 scatter(glue([[BALL, 0, 0.5, 0, 0, 0, 1, 0.75, 1]]), new THREE.MeshLambertMaterial({ color: 0xffffff }), decor.brain, pickFrom([0xe8b06a, 0xd88aa0, 0xa8c86a, 0x8ab0d8]), (at) => [1.1 * at.size, 1.1 * at.size]);
-scatter(glue([[new THREE.CylinderGeometry(1.5, 1.1, 0.18, 14), 0, 1.1, 0], [STICK, 0, 0.5, 0, 0, 0, 0.22, 1.1, 0.22]]), new THREE.MeshLambertMaterial({ color: 0xffffff }), decor.table, pickFrom([0x5ab8c8, 0xd8a05a, 0xb87ad0]), (at) => [1.3 * at.size, 1.1 * at.size]);
+scatter(glue([[new THREE.CylinderGeometry(1.5, 1.1, 0.18, 14), 0, 1.1, 0], [STICK, 0, 0.5, 0, 0, 0, 0.22, 1.1, 0.22]]), glowAtNight(new THREE.MeshLambertMaterial({ color: 0xffffff })), decor.table, pickFrom([0x5ab8c8, 0xd8a05a, 0xb87ad0]), (at) => [1.3 * at.size, 1.1 * at.size]);
 // The Crystal Fields: clusters of giant crystals that shine with their own light
 scatter(glue([[CONE, 0, 0.5, 0, 0, 0, 0.16, 1, 0.16], [CONE, 0.22, 0.34, 0.06, 0, -0.45, 0.12, 0.7, 0.12], [CONE, -0.2, 0.3, -0.05, 0.2, 0.5, 0.11, 0.62, 0.11], [CONE, 0.04, 0.26, 0.22, 0.55, 0, 0.1, 0.55, 0.1]]),
   new THREE.MeshBasicMaterial({ color: 0xffffff }), decor.crystal, pickFrom([0xb07aff, 0xff8ae8, 0x7ad8ff, 0xd0a0ff]), (at) => [5 * at.size, 7 * at.size]);
@@ -366,25 +417,56 @@ const box = (w, h, d, colour, x, y, z, parent) => {
   return mesh;
 };
 const glowPaint = (colour) => new THREE.MeshBasicMaterial({ color: colour });
-// Your raft: planks on four barrels, with a mast, a lamp, a workbench and a ladder down into the water
+// Your pod: a round white cabin floating in an orange ring, with a hatch on top, a mast with a lamp, and a ladder down into the water
 const raft = new THREE.Group();
-box(10, 0.4, 10, 0xb98c50, 0, 0.5, 0, raft);
-for (let n = -4; n <= 4; n += 2) box(0.12, 0.42, 10, 0x8f6a3a, n, 0.5, 0, raft);
-for (const [x, z] of [[-3.5, -3.5], [3.5, -3.5], [-3.5, 3.5], [3.5, 3.5]]) {
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 2.4, 12), paint(0x3a6ad8));
-  barrel.rotation.z = Math.PI / 2;
-  barrel.position.set(x, -0.2, z);
-  raft.add(barrel);
-}
-box(0.3, 7, 0.3, 0x8f6a3a, -3.5, 4, -3.5, raft);
-box(0.1, 1.6, 2.4, 0xff7a4a, -3.5, 6.4, -2.2, raft);
-const raftLamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 8), glowPaint(0xfff0a0));
-raftLamp.position.set(-3.5, 7.8, -3.5);
+const podGlass = new THREE.MeshPhongMaterial({ color: 0x2a6a9a, shininess: 140, specular: 0xffffff, side: THREE.DoubleSide });       // (its windows light up at night)
+(function () {
+  const white = new THREE.MeshPhongMaterial({ color: 0xf2f2ee, shininess: 70 }), orange = new THREE.MeshPhongMaterial({ color: 0xff7a2a, shininess: 50 });
+  const cabin = new THREE.Mesh(new THREE.SphereGeometry(4.4, 28, 18), white);
+  cabin.scale.y = 0.82;
+  cabin.position.y = 0.9;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(4.7, 1, 12, 34), orange);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = 0.1;
+  const stripe = new THREE.Mesh(new THREE.TorusGeometry(4.05, 0.16, 8, 34), orange);
+  stripe.rotation.x = Math.PI / 2;
+  stripe.position.y = 2.6;
+  const hatch = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.5, 0.7, 18), paint(0x8a94a6));
+  hatch.position.y = 4.6;
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.1, 6, 16), orange);
+  wheel.rotation.x = Math.PI / 2;
+  wheel.position.y = 5.05;
+  const keel = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1, 2.6, 16), paint(0x8a94a6));
+  keel.position.y = -3.2;
+  raft.add(cabin, ring, stripe, hatch, wheel, keel);
+  for (let k = 0; k < 6; k++) {              // round windows all the way round
+    const pane = new THREE.Mesh(new THREE.CircleGeometry(0.7, 14), podGlass);
+    pane.position.set(Math.cos(k * 1.047 + 0.52) * 4.28, 1.9, Math.sin(k * 1.047 + 0.52) * 4.28);
+    pane.lookAt(pane.position.x * 2, pane.position.y + (pane.position.y - 0.9) * 1.4, pane.position.z * 2);
+    raft.add(pane);
+  }
+  // On one side of the pod is the locker, where your things are kept safe...
+  box(2.4, 2.3, 1.3, 0x4a7ab0, 0, 2.2, -4.9, raft);
+  box(0.08, 2.1, 0.06, 0x2a4a7a, 0, 2.2, -5.57, raft);
+  for (const x of [-0.25, 0.25]) box(0.1, 0.5, 0.1, 0xf2c02a, x, 2.2, -5.6, raft);
+  box(2.6, 0.16, 1.5, 0x2a4a7a, 0, 3.4, -4.9, raft);
+  // ...and on the other side is the fabricator, which makes your gear: a machine with a glowing screen and a little arm
+  box(2.4, 1.7, 1.3, 0x8a94a6, 0, 1.9, 4.9, raft);
+  box(1.5, 0.8, 0.06, glowPaint(0x7affe0), -0.2, 2.1, 5.57, raft);
+  for (const y of [1.5, 1.75]) box(0.3, 0.14, 0.08, glowPaint(0xff7a2a), 0.85, y, 5.57, raft);
+  box(0.2, 0.9, 0.2, 0xff7a2a, 0.8, 3.2, 4.9, raft);
+  box(1.2, 0.16, 0.2, 0xff7a2a, 0.3, 3.6, 4.9, raft);
+  box(0.12, 0.4, 0.12, glowPaint(0x7affe0), -0.25, 3.35, 4.9, raft);
+  box(0.2, 5, 0.2, 0x8a94a6, -1.6, 6.8, -1.6, raft);                    // the mast
+  box(2.4, 0.12, 1.6, 0x2a4a8a, 1.4, 4.9, -1.6, raft).rotation.z = 0.25;    // a solar panel
+  box(3.2, 0.3, 3, 0x8a94a6, 6.2, 0.45, 0, raft);                       // a little deck by the door...
+  box(0.2, 2.4, 1.8, 0x8a94a6, 4.3, 1.7, 0, raft);
+  for (let n = 0; n < 6; n++) box(1.2, 0.12, 0.12, 0xd8dce6, 7.9, 0.2 - n * 0.6, 0, raft);      // ...and a ladder down into the sea
+  for (const z of [-0.6, 0.6]) box(0.12, 4, 0.12, 0xd8dce6, 7.9, -1.4, z, raft);
+})();
+const raftLamp = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 8), glowPaint(0xff5a5a));
+raftLamp.position.set(-1.6, 9.5, -1.6);
 raft.add(raftLamp);
-box(3, 1.2, 1.4, 0x8a5a36, 2.5, 1.3, -3.4, raft);
-box(1.4, 1.4, 1.4, 0xc89a5c, -2.8, 1.4, 3.2, raft);
-for (let n = 0; n < 6; n++) box(1.2, 0.12, 0.12, 0xd8dce6, 5.2, 0.4 - n * 0.6, 0, raft);
-for (const z of [-0.6, 0.6]) box(0.12, 4, 0.12, 0xd8dce6, 5.2, -1.2, z, raft);
 scene.add(raft);
 // The sunken boat on the Twilight Slope
 (function () {
@@ -591,6 +673,22 @@ const SPECIES = {
     text: "It flashes pink and violet as it zips between the giant crystals. Nobody knows how it never bumps into one." },
   cinderfin: { name: "Cinderfin", count: 16, school: 4, depth: [195, 240], side: "vents", rise: 0.3, speed: 2.4, size: 0.5, shy: true, make: () => fishModel(0xff7a2a, 0xffd04a, { glow: true, tall: 1.2 }),
     text: "A fish that loves hot water. It glows like a coal from the fire and warms itself over the vents." },
+  // A giant jellyfish. tall: how far its arms hang down below it. sting: how much its arms hurt.
+  glowbell: { name: "Giant Glowbell", count: 3, levi: true, depth: [95, 240], roam: 70, rise: 0.75, speed: 0.8, size: 6, jelly: true, sting: 24, tall: 3.4, make: function () {
+    const group = new THREE.Group(), see = (colour, opacity) => new THREE.MeshBasicMaterial({ color: colour, transparent: true, opacity: opacity, side: THREE.DoubleSide, fog: false, depthWrite: false });
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(1, 22, 10, 0, Math.PI * 2, 0, Math.PI / 2), see(0x5ac8ff, 0.5)));          // the bell...
+    group.add(new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), see(0xd8fbff, 0.7)));        // ...with a brighter bell inside it
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.05, 6, 28), new THREE.MeshBasicMaterial({ color: 0xe8ffff, fog: false }));
+    rim.rotation.x = Math.PI / 2;
+    group.add(rim);
+    for (let k = 0; k < 14; k++) dab(BALL, new THREE.MeshBasicMaterial({ color: k % 2 ? 0xff9af0 : 0x9affe8, fog: false }), Math.cos(k * 0.449) * 1, 0.02, Math.sin(k * 0.449) * 1, 0.07, 0.07, 0.07, group);
+    for (let k = 0; k < 10; k++) {              // long thin arms that trail far below
+      const long = 2.4 + (k % 3) * 0.5;
+      dab(STICK, new THREE.MeshBasicMaterial({ color: 0xa0e8ff, fog: false }), Math.cos(k * 0.628) * 0.82, -long / 2, Math.sin(k * 0.628) * 0.82, 0.025, long, 0.025, group);
+    }
+    for (let k = 0; k < 4; k++) dab(STICK, see(0xffb0f0, 0.85), Math.cos(k * 1.57) * 0.25, -1.1, Math.sin(k * 1.57) * 0.25, 0.1, 2.2, 0.1, group);        // and four thick, frilly ones in the middle
+    return { group: group };
+  }, text: "LEVIATHAN. A jellyfish as big as a house, glowing like a lantern. It is not fierce at all, but its long arms sting hard: swim round it, never under it." },
   // The leviathans: the giants of the deep. lair: where each one lives. roam: how far it wanders from there.
   // hull: how much harm it does to the Bubble (a leviathan is the only thing that can hurt it).
   lumen: { name: "Lumen Ray", count: 1, levi: true, lair: "lumen", roam: 170, rise: 0.6, speed: 3.4, size: 13, make: () => rayModel(0x8ad0ff, 0xe8fbff, true),
@@ -607,6 +705,30 @@ const SPECIES = {
     }
     return { group: group };
   }, text: "LEVIATHAN. DANGER. A crab as big as a cottage, with a shell of cooled lava. It guards the Ember Vents and stamps on anything that comes too close." },
+  gapejaw: { name: "Gapejaw", count: 1, levi: true, lair: "gapejaw", roam: 150, rise: 0.45, speed: 3.6, size: 6.5, hunter: { range: 62, speed: 11, reach: 7.5, bite: 48, wait: 3, hull: 36 }, make: function () {
+    const group = new THREE.Group(), tail = new THREE.Group(), jaw = new THREE.Group();
+    dab(BALL, 0x39324a, 0, 0.1, -0.2, 0.55, 0.5, 1.1, group);                 // the body
+    dab(BALL, 0x4a4060, 0, 0.34, 0.75, 0.62, 0.34, 0.72, group);              // the top of its enormous head
+    for (let k = -4; k <= 4; k++) dab(CONE, 0xf4f0e0, k * 0.125, 0.08, 1.28 - Math.abs(k) * 0.045, 0.05, 0.32, 0.05, group).rotation.x = Math.PI;       // top teeth
+    // The bottom jaw swings open and shut on a hinge at the back of the head
+    jaw.position.set(0, -0.02, 0.2);
+    dab(BALL, 0x2e283c, 0, -0.16, 0.62, 0.6, 0.2, 0.74, jaw);
+    for (let k = -4; k <= 4; k++) dab(CONE, 0xf4f0e0, k * 0.125, 0.12, 1.14 - Math.abs(k) * 0.045, 0.05, 0.36, 0.05, jaw);
+    dab(BALL, glowPaint(0xff5a7a), 0, -0.02, 0.55, 0.34, 0.05, 0.44, jaw);    // (its throat glows red)
+    group.add(jaw);
+    for (const side of [-1, 1]) {
+      dab(BALL, glowPaint(0xffe14a), side * 0.46, 0.5, 1.02, 0.09, 0.09, 0.09, group);
+      dab(BALL, 0x101018, side * 0.5, 0.5, 1.08, 0.045, 0.045, 0.045, group);
+      for (let k = 0; k < 5; k++) dab(BALL, glowPaint(0x7affd0), side * (0.52 - k * 0.03), 0.12, 0.25 - k * 0.3, 0.035, 0.1, 0.08, group);        // glowing spots down its sides
+      dab(BALL, 0x5a5078, side * 0.62, -0.1, 0.1, 0.34, 0.04, 0.2, group);
+    }
+    for (let k = 0; k < 4; k++) dab(CONE, 0x5a5078, 0, 0.66 - k * 0.04, 0.25 - k * 0.36, 0.04, 0.42 - k * 0.06, 0.2, group);       // spikes along its back
+    tail.position.z = -1.15;
+    dab(BALL, 0x39324a, 0, 0.05, -0.45, 0.26, 0.3, 0.7, tail);
+    dab(CONE, 0x5a5078, 0, 0.05, -1.25, 0.06, 0.95, 0.5, tail).rotation.x = Math.PI / 2;
+    group.add(tail);
+    return { group: group, tail: tail, jaw: jaw };
+  }, text: "LEVIATHAN. DANGER. A fish that is nearly all mouth. It lurks among the ribs of the Whale Graveyard, and its jaws could swallow the Bubble whole. The Bubble can just outrun it." },
   tidewyrm: { name: "Tidewyrm", count: 1, levi: true, lair: "tidewyrm", roam: 200, rise: 0.5, speed: 5, size: 4.6, hunter: { range: 66, speed: 13.5, reach: 6.5, bite: 45, wait: 3, hull: 34 }, chain: 18, make: () => fishModel(0x2a7a6a, 0x7affc8, { wide: 1.4, tall: 1.1, teeth: true }),
     text: "LEVIATHAN. DANGER. A sea serpent longer than a train. It hunts across the Deep Plains and is faster than the Bubble, unless you have a pearl booster or a sea whistle." },
   kraken: { name: "Abyss Kraken", count: 1, levi: true, lair: "kraken", roam: 150, rise: 0.25, speed: 3, size: 9, hunter: { range: 78, speed: 9.5, reach: 10, bite: 50, wait: 3.2, hull: 40 }, arms: 6, make: function () {
@@ -673,13 +795,48 @@ for (const kind in SPECIES) {
   }
 }
 
+// ----- Day and night -----
+const DAY = 420;             // how long a whole day and night lasts, in seconds (7 minutes)
+// state.time counts the seconds since sunrise. The sun comes up, shines for most of the day, sets, and then it is night until the next sunrise.
+// sunUp() says how much daylight there is: 1 in the day, 0 at night, and in between while the sun rises or sets.
+function sunUp() {
+  const t = state.time / DAY;
+  return t < 0.05 ? t / 0.05 : t < 0.6 ? 1 : t < 0.68 ? 1 - (t - 0.6) / 0.08 : 0;
+}
+const timeName = () => { const t = state.time / DAY; return t < 0.05 ? "☀ Sunrise" : t < 0.3 ? "☀ Morning" : t < 0.6 ? "☀ Afternoon" : t < 0.68 ? "☀ Sunset" : "☾ Night"; };
+// A new day begins: you have survived one more, and the sea has washed in new things to find
+function newDay() {
+  state.time = 0;
+  state.days += 1;
+  state.best = Math.max(state.best, state.days);
+  for (const thing of loot) if (thing.taken && !thing.covered) {
+    thing.taken = false;
+    showLoot(thing, true);
+  }
+}
+function passTime(dt) {
+  const before = sunUp();
+  state.time += dt;
+  if (state.time >= DAY) {
+    newDay();
+    sfx.make();
+    toast("Sunrise! You have survived " + state.days + (state.days === 1 ? " day" : " days") + ". The sea has washed in new things to find.", 6);
+  } else if (before > 0.5 && sunUp() <= 0.5) toast("Night is falling. The sea goes dark and the hunters grow bolder. Shelter in your pod or your base" + (state.gear.torch ? ", or light your torch (T)." : "."), 7);
+}
+// If you black out, your count of days survived starts again
+function lostCount() {
+  const had = state.days;
+  state.days = 0;
+  return had > 0 ? " Your count of days survived starts again from 0 (you had " + had + ")." : "";
+}
+
 // ----- What the game remembers -----
 const SAVE_NAME = "deepwildSave";
 const emptyBag = () => Object.keys(LOOT).reduce((bag, kind) => Object.assign(bag, { [kind]: 0 }), {});
 // bag: how many of each material you carry. gear: what you have made. base: the pieces of your base. hull: how strong the Bubble is (out of 100).
-const freshState = () => ({ bag: emptyBag(), gear: {}, tablets: [false, false, false, false], journal: [], won: false, subAt: null, base: [], tunnels: [], hull: 100 });
+const freshState = () => ({ bag: emptyBag(), gear: {}, tablets: [false, false, false, false], journal: [], won: false, subAt: null, base: [], time: DAY * 0.08, days: 0, best: 0, food: 100, water: 100, power: 0, kits: {}, locker: Object.assign(emptyBag(), { water: 2, cooked: 2 }), tunnels: [], hull: 100 });
 let state = freshState();
-const DOCK = { x: 12, y: -1.8, z: 7 };           // where the Bubble waits, a little way from the raft
+const DOCK = { x: 13, y: -1.8, z: 9 };           // where the Bubble waits, a little way from the pod
 const player = { x: 7, y: -0.5, z: 0, vx: 0, vy: 0, vz: 0, yaw: -Math.PI / 2, pitch: 0, air: 45, hp: 100, inSub: false };
 let mode = "title";          // title, raft, swim
 let card = null;             // a message on the screen (press Space to go on)
@@ -716,6 +873,20 @@ function nextCard() {
   if (done) done();
 }
 
+// ----- Power -----
+// Your base runs on power. Every room has a battery that holds 100, and uses a little all the time for its lights and its air.
+// Solar panels make power while the sun is up (more in shallow water, where the light is strong). A vent generator makes it day and night.
+// With no power left, the lights go out, the fabricators stop, and the air inside is no longer made fresh.
+let powered = true;
+const powerCap = () => state.base.filter(isRoom).length * 100;
+const solarShare = (part) => clamp(1 + part.y / 130, 0.1, 1);            // (part.y is how far below the waves the panel stands, as a minus number)
+const powerMade = () => state.base.reduce((sum, part) => sum + (part.kind === "solar" ? sunUp() * solarShare(part) : part.kind === "thermal" ? 1.2 : 0), 0);
+const powerUsed = () => state.base.filter(isRoom).length * 0.15;
+function runPower(dt) {
+  state.power = clamp(state.power + (powerMade() - powerUsed()) * dt, 0, powerCap());
+  powered = state.power > 0.01;
+}
+
 // ----- Your base -----
 // Press B (or use the Builder tool) to build on the sea bed. Rooms are full of air: inside one you can breathe, rest and make gear,
 // and nothing can hurt you. Tunnels join rooms together, poles lift them off the sea bed, and each kind of room does something special.
@@ -738,116 +909,296 @@ function halo(colour, size, x, y, z, parent) {
   sprite.position.set(x, y, z);
   parent.add(sprite);
 }
-const glassPaint = () => new THREE.MeshPhongMaterial({ color: 0xbff0ff, transparent: true, opacity: 0.26, shininess: 140, side: THREE.DoubleSide, depthWrite: false });
-// The shell that every dome room shares. glass: you can see through it. band: the colour of the ring round its foot. raised: it stands on poles.
-function domeShape(group, look, raised) {
-  const skin = look.glass ? glassPaint() : new THREE.MeshLambertMaterial({ color: 0xaab8cc, side: THREE.DoubleSide, emissive: 0x10161e });
-  group.add(new THREE.Mesh(new THREE.SphereGeometry(3.4, 22, 10, 0, Math.PI * 2, 0, Math.PI / 2), skin));
-  if (!raised) {
-    const footing = new THREE.Mesh(new THREE.CylinderGeometry(3.55, 3.75, 4, 22), paint(0x8a94a6));       // (so it sits level on bumpy ground)
-    footing.position.y = -2;
-    group.add(footing);
+const glassPaint = () => new THREE.MeshPhongMaterial({ color: 0xbff0ff, transparent: true, opacity: 0.22, shininess: 160, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false });
+const wallPaint = () => new THREE.MeshPhongMaterial({ color: 0x8fa0b8, side: THREE.DoubleSide, emissive: 0x0c1218, shininess: 40 });
+// A round table with stools, to make a room feel lived in
+function tableAndStools(group, x, z) {
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.12, 16), paint(0xc8a878));
+  top.position.set(x, 0.85, z);
+  group.add(top);
+  box(0.25, 0.85, 0.25, 0x5a6070, x, 0.42, z, group);
+  for (let k = 0; k < 3; k++) {
+    const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.5, 10), paint(0xf2c02a));
+    stool.position.set(x + Math.cos(k * 2.09) * 1.8, 0.25, z + Math.sin(k * 2.09) * 1.8);
+    group.add(stool);
   }
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(3.4, 22), paint(0xc8a878));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = 0.06;
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(3.45, 0.22, 8, 26), paint(look.band || 0xf2c02a));
-  rim.rotation.x = Math.PI / 2;
-  rim.position.y = 0.2;
-  group.add(floor, rim);
+}
+// Rooms are square. Their four walls are numbered: 0 faces south (+z), 1 east (+x), 2 north (-z), 3 west (-x).
+const WALL_WAYS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+const halfOf = (part) => (part.kind === "lookout" ? 3 : ROOM);          // from the middle of a room to its walls
+// A spot on a wall: "along" is how far along the wall it is from the wall's middle, "inset" how far in from the wall towards the middle of the room
+const wallSpot = (wall, half, along, inset) => (wall % 2 ? [WALL_WAYS[wall][0] * (half - inset), along] : [along, WALL_WAYS[wall][1] * (half - inset)]);
+// Where do tunnels leave this room? For each one: which wall, how far along it, and how wide a gap it needs.
+function exitsOf(part) {
+  const half = halfOf(part), exits = [];
+  for (const tunnel of state.tunnels) {
+    const mine = tunnel.ax === part.x && tunnel.az === part.z, theirs = tunnel.bx === part.x && tunnel.bz === part.z;
+    if (!mine && !theirs) continue;
+    const dx = (tunnel.bx - tunnel.ax) * (mine ? 1 : -1), dz = (tunnel.bz - tunnel.az) * (mine ? 1 : -1), flat = Math.hypot(dx, dz) || 1, ux = dx / flat, uz = dz / flat, big = Math.max(Math.abs(ux), Math.abs(uz));
+    const wall = Math.abs(uz) >= Math.abs(ux) ? (uz > 0 ? 0 : 2) : ux > 0 ? 1 : 3;
+    exits.push({ wall: wall, at: ((wall % 2 ? uz : ux) / big) * half, wide: TUBE / big + 0.1 });
+  }
+  return exits;
+}
+// Every room has one hatch: a round door in the first wall that has no tunnel. It is the only way in from the sea.
+function hatchOf(part) {
+  const used = exitsOf(part).map((exit) => exit.wall), free = [0, 1, 2, 3].find((wall) => !used.includes(wall)), wall = free === undefined ? 0 : free;
+  const [nx, nz] = WALL_WAYS[wall], half = halfOf(part);
+  return { wall: wall, nx: nx, nz: nz, x: part.x + nx * half, y: part.y + 1.3, z: part.z + nz * half };
+}
+// Every room has a fabricator built into the wall beside its hatch. It goes right through the wall,
+// so you can use it from inside the room and from outside in the sea. ("out" is where its outside face is.)
+function fabOf(part) {
+  const hatch = hatchOf(part), half = halfOf(part), along = part.kind === "lookout" ? -1.95 : -2.4;
+  const [x, z] = wallSpot(hatch.wall, half, along, 0.55), [ox, oz] = wallSpot(hatch.wall, half, along, -0.35);
+  return { kind: "fab", fixed: true, x: x, z: z, turn: Math.atan2(-hatch.nx, -hatch.nz), out: { x: part.x + ox, y: part.y + 1.4, z: part.z + oz } };
+}
+// Draw the fabricator on a room's wall: the machine inside, and its other face on the outside
+function addFab(group, part, spin) {
+  const fab = fabOf(part), back = new THREE.Group();
+  group.add(makeItem(fab, spin));
+  back.position.set(fab.out.x - part.x, 0, fab.out.z - part.z);
+  back.rotation.y = fab.turn + Math.PI;
+  box(1.9, 1.6, 0.5, 0x8a94a6, 0, 1.4, 0, back);
+  box(1.2, 0.7, 0.06, screenPaint(0x7affe0), -0.15, 1.5, 0.27, back);
+  for (const y of [1.3, 1.6]) box(0.22, 0.12, 0.06, screenPaint(0xff7a2a), 0.68, y, 0.27, back);
+  box(2.1, 0.16, 0.7, 0xff7a2a, 0, 2.28, 0, back);
+  box(2.1, 0.16, 0.7, 0xff7a2a, 0, 0.52, 0, back);
+  group.add(back);
+}
+// Build four walls out of flat panels, leaving a gap wherever a tunnel comes in. (base: how high up the walls start.)
+function addWalls(group, part, half, high, material, base) {
+  const exits = part ? exitsOf(part) : [];
+  for (let wall = 0; wall < 4; wall++) {
+    const gaps = exits.filter((exit) => exit.wall === wall).map((exit) => [clamp(exit.at - exit.wide, -half, half), clamp(exit.at + exit.wide, -half, half)]).sort((a, b) => a[0] - b[0]);
+    const panel = function (from, to, low, top) {
+      if (to - from < 0.05 || top - low < 0.05) return;
+      const [x, z] = wallSpot(wall, half, (from + to) / 2, 0);
+      box(wall % 2 ? 0.2 : to - from, top - low, wall % 2 ? to - from : 0.2, material, x, (base || 0) + (low + top) / 2, z, group);
+    };
+    let from = -half;
+    for (const [a, b] of gaps) {
+      panel(from, a, 0, high);
+      panel(a, b, 4.1, high);            // (the bit of wall above the tunnel)
+      from = Math.max(from, b);
+    }
+    panel(from, half, 0, high);
+  }
+}
+// The round door, with a wheel to turn and two green lights so you can find it in the dark
+function addHatch(group, part) {
+  const hatch = hatchOf(part), door = new THREE.Group();
+  door.position.set(hatch.x - part.x, 1.3, hatch.z - part.z);
+  door.rotation.y = Math.atan2(hatch.nx, hatch.nz);
+  door.add(new THREE.Mesh(new THREE.TorusGeometry(1, 0.16, 8, 22), paint(0xff7a2a)));
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.92, 0.92, 0.46, 20), paint(0x5a6880));
+  lid.rotation.x = Math.PI / 2;
+  door.add(lid);
+  for (const z of [-0.3, 0.3]) {
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.06, 6, 16), paint(0xf2c02a));
+    wheel.position.z = z;
+    door.add(wheel);
+    for (const turn of [0, Math.PI / 2]) box(0.84, 0.07, 0.07, 0xf2c02a, 0, 0, z, door).rotation.z = turn;
+  }
+  for (const x of [-1.5, 1.5]) for (const z of [-0.22, 0.22]) {
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), new THREE.MeshBasicMaterial({ color: 0x7affa0, fog: false }));
+    lamp.position.set(x, 0.9, z);
+    door.add(lamp);
+  }
+  group.add(door);
+}
+// The lights of your base only shine while it has power. (These paints are shared, so they can all be switched at once.)
+const windowGlow = new THREE.MeshBasicMaterial({ color: 0xffe9a0 }), roomLamp = new THREE.MeshBasicMaterial({ color: 0xfff0a0 });
+const screens = [];              // every glowing screen in your base, and the colour it glows
+function screenPaint(colour) {
+  const material = new THREE.MeshBasicMaterial({ color: colour });
+  screens.push([material, colour]);
+  return material;
+}
+// One of the things you can build inside a room. They all face along +z, and "turn" spins them to face the way you were looking.
+function makeItem(item, spin) {
+  const group = new THREE.Group(), kind = item.kind;
+  group.position.set(item.x, 0.06, item.z);
+  group.rotation.y = item.turn || 0;
+  if (kind === "fab") {
+    // A fabricator: a machine with a glowing screen and a little arm on top
+    box(1.8, 1.9, 0.8, 0x8a94a6, 0, 0.95, 0, group);
+    box(1.2, 0.7, 0.06, screenPaint(0x7affe0), -0.15, 1.3, 0.42, group);
+    for (const y of [1.1, 1.4]) box(0.22, 0.12, 0.06, screenPaint(0xff7a2a), 0.68, y, 0.42, group);
+    box(0.16, 0.7, 0.16, 0xff7a2a, 0.6, 2.25, 0, group);
+    box(0.9, 0.14, 0.16, 0xff7a2a, 0.2, 2.6, 0, group);
+  } else if (kind === "locker") {
+    box(1.5, 2.5, 0.8, 0x4a7ab0, 0, 1.25, 0, group);
+    box(0.06, 2.3, 0.05, 0x2a4a7a, 0, 1.25, 0.42, group);
+    for (const x of [-0.2, 0.2]) box(0.08, 0.4, 0.08, 0xf2c02a, x, 1.3, 0.44, group);
+  } else if (kind === "bed") {
+    box(1.5, 0.5, 2.8, 0x5a6070, 0, 0.3, 0, group);
+    box(1.4, 0.25, 2.6, 0xd84a3a, 0, 0.65, 0, group);
+    box(1.3, 0.2, 0.6, 0xf2f2ee, 0, 0.8, -1, group);
+  } else if (kind === "oven") {
+    box(1.8, 1.6, 1.1, 0x4a4e5a, 0, 0.8, 0, group);
+    box(1.2, 0.7, 0.08, screenPaint(0xff8a2a), 0, 0.7, 0.58, group);
+    box(1.8, 0.12, 1.15, 0x2a2e3a, 0, 1.66, 0, group);
+    box(0.5, HIGH - 1.7, 0.5, 0x4a4e5a, 0, (HIGH + 1.7) / 2, -0.25, group);
+  } else if (kind === "tank") {
+    // A fish tank: the fish you put in swim round and round
+    const glass = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 2.2, 20), new THREE.MeshPhongMaterial({ color: 0x4ab8ff, transparent: true, opacity: 0.3, shininess: 120, depthWrite: false }));
+    glass.position.y = 1.5;
+    const stand = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.5, 0.4, 20), paint(0x5a6070));
+    stand.position.y = 0.2;
+    const lid = stand.clone();
+    lid.position.y = 2.7;
+    const swimmers = new THREE.Group();
+    swimmers.position.y = 1.5;
+    for (let n = 0; n < (item.fish || 0); n++) {
+      const fish = fishModel([0xffd84a, 0x4a9af0, 0xff7a2a, 0xc08aff][n % 4], 0xffffff).group;
+      fish.scale.setScalar(0.4);
+      fish.position.set(Math.cos(n * 1.57) * 0.8, (n % 2) * 0.7 - 0.35, Math.sin(n * 1.57) * 0.8);
+      fish.rotation.y = -n * 1.57;
+      swimmers.add(fish);
+    }
+    group.add(glass, stand, lid, swimmers);
+    spin.push(swimmers);
+  } else if (kind === "planter") {
+    box(2.2, 0.6, 2.2, 0x8a5a36, 0, 0.3, 0, group);
+    box(1.9, 0.2, 1.9, 0x3a2c22, 0, 0.62, 0, group);
+    for (let n = 0; n < 5; n++) {
+      const frond = new THREE.Mesh(CONE, paint(n % 2 ? 0x6ac84a : 0x4aa83a));
+      frond.scale.set(0.2, 1.5 + (n % 3) * 0.4, 0.2);
+      frond.position.set(n === 4 ? 0 : n % 2 ? 0.55 : -0.55, 1.4 + (n % 3) * 0.2, n === 4 ? 0 : n < 2 ? 0.55 : -0.55);
+      group.add(frond);
+    }
+  } else if (kind === "reactor") {
+    // A kelp reactor: feed it kelp and it makes power
+    const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, 1.9, 16), paint(0x3a5a48));
+    drum.position.y = 0.95;
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.83, 0.83, 0.6, 16), new THREE.MeshBasicMaterial({ color: 0x7affa0 }));
+    core.position.y = 1.1;
+    group.add(drum, core);
+    box(0.5, 0.4, 0.5, 0xf2c02a, 0, 2.1, 0, group);
+    for (const x of [-1, 1]) box(0.16, 1.4, 0.16, 0x5a6070, x, 0.7, 0, group);
+  } else if (kind === "table") tableAndStools(group, 0, 0);
+  return group;
+}
+// The shell that every square room shares. glass: you can see through it. band: the colour of its frame. (A room on poles has no footing.)
+function roomShape(group, part, look) {
+  const half = ROOM, band = look.band || 0xf2c02a, skin = look.glass ? glassPaint() : wallPaint();
+  addWalls(group, part, half, HIGH, skin);
+  box(half * 2 + 0.3, 0.25, half * 2 + 0.3, skin, 0, HIGH + 0.1, 0, group);                       // the roof
+  box(half * 2, 0.2, half * 2, 0x8e98aa, 0, -0.04, 0, group);                                    // the floor
+  if (!part.on) box(half * 2 + 0.5, 9, half * 2 + 0.5, 0x7a8698, 0, -4.64, 0, group);            // (a footing, so it sits level on bumpy ground)
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(2.6, 24), paint(band));
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.y = 0.08;
+  group.add(rug);
+  // A frame: a post at each corner, and beams round the top and the bottom
+  for (const x of [-half, half]) for (const z of [-half, half]) box(0.45, HIGH + 0.4, 0.45, band, x, HIGH / 2, z, group);
+  for (const y of [0.15, HIGH + 0.1]) for (const side of [-half, half]) {
+    box(half * 2, 0.3, 0.3, band, 0, y, side, group);
+    box(0.3, 0.3, half * 2, band, side, y, 0, group);
+  }
   if (look.glass) {
-    for (let k = 0; k < 3; k++) {
-      const rib = new THREE.Mesh(new THREE.TorusGeometry(3.42, 0.1, 6, 20, Math.PI), paint(look.band || 0xf2c02a));
-      rib.rotation.y = k * 1.047;
-      group.add(rib);
+    for (const at of [-half / 3, half / 3]) {              // thin ribs across the glass roof
+      box(half * 2, 0.16, 0.16, band, 0, HIGH + 0.2, at, group);
+      box(0.16, 0.16, half * 2, band, at, HIGH + 0.2, 0, group);
     }
   } else {
-    for (let k = 0; k < 5; k++) {       // round windows, glowing with the light inside
-      const pane = new THREE.Mesh(new THREE.CircleGeometry(0.7, 12), new THREE.MeshBasicMaterial({ color: 0xffe9a0, side: THREE.DoubleSide }));
-      pane.position.set(Math.cos(k * 1.257) * 3.06, 1.5, Math.sin(k * 1.257) * 3.06);
-      pane.lookAt(pane.position.x * 2, pane.position.y * 2, pane.position.z * 2);
-      group.add(pane);
+    // Round windows: from outside they glow with the light of the room, and from inside they show the blue of the sea
+    const exits = exitsOf(part), hatch = hatchOf(part);
+    for (let wall = 0; wall < 4; wall++) for (const along of [-4.4, 0, 4.4]) {
+      if ((along === 0 && wall === hatch.wall) || exits.some((exit) => exit.wall === wall && Math.abs(exit.at - along) < exit.wide + 1.3)) continue;
+      const [nx, nz] = WALL_WAYS[wall];
+      const out = new THREE.Mesh(new THREE.CircleGeometry(1, 16), windowGlow);
+      const [ox, oz] = wallSpot(wall, half, along, -0.13);
+      out.position.set(ox, 2.8, oz);
+      out.rotation.y = Math.atan2(nx, nz);
+      const inner = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshPhongMaterial({ color: 0x1f8fb4, emissive: 0x0c4a66, shininess: 120 }));
+      const [ix, iz] = wallSpot(wall, half, along, 0.13);
+      inner.position.set(ix, 2.8, iz);
+      inner.rotation.y = Math.atan2(-nx, -nz);
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(1.02, 0.1, 6, 18), paint(0x5a6880));
+      rim.position.copy(inner.position);
+      rim.rotation.y = inner.rotation.y;
+      group.add(out, inner, rim);
     }
   }
-  const light = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), glowPaint(0xfff0a0));
-  light.position.y = 3.05;
+  addHatch(group, part);
+  const light = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 8), roomLamp);
+  light.position.y = HIGH - 0.5;
   group.add(light);
 }
 function makePart(part) {
   const kind = part.kind, group = new THREE.Group();
   if (kind === "dome" || kind === "glassdome") {
-    domeShape(group, { glass: kind === "glassdome" }, part.on);
-    box(1.7, 0.9, 0.8, 0x8a5a36, 0, 0.5, -2, group);                  // a workbench...
-    box(1.2, 0.5, 2, 0xd84a3a, 1.9, 0.3, 0.6, group);                 // ...and a bunk
-  } else if (kind === "kitchen") {
-    // A kitchen: an oven with a glowing door, a counter, and a chimney on the roof
-    domeShape(group, { band: 0xff7a2a }, part.on);
-    box(1.5, 1.5, 1, 0x4a4e5a, 0, 0.75, -2.1, group);
-    box(1, 0.7, 0.1, glowPaint(0xff8a2a), 0, 0.7, -1.56, group);
-    box(2.4, 0.9, 0.9, 0xd8dce6, -1.9, 0.45, 0.4, group).rotation.y = 0.9;
-    box(0.5, 2.6, 0.5, 0x4a4e5a, 0, 4.2, -2.1, group);
-    box(0.8, 0.3, 0.8, 0xff7a2a, 0, 5.6, -2.1, group);
-  } else if (kind === "aquarium") {
-    // An aquarium: a glass room with a round tank in the middle. The fish you put in swim round and round.
-    domeShape(group, { glass: true, band: 0x4ad8c8 }, part.on);
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 2, 18), new THREE.MeshPhongMaterial({ color: 0x4ab8ff, transparent: true, opacity: 0.3, shininess: 120, depthWrite: false }));
-    tank.position.y = 1.2;
-    box(3.2, 0.2, 3.2, 0x5a6070, 0, 0.15, 0, group);
-    const swimmers = new THREE.Group();
-    swimmers.position.y = 1.2;
-    for (let n = 0; n < (part.fish || 0); n++) {
-      const fish = fishModel([0xffd84a, 0x4a9af0, 0xff7a2a, 0xc08aff, 0x7affe0, 0xf06a9a][n % 6], 0xffffff).group;
-      fish.scale.setScalar(0.32);
-      fish.position.set(Math.cos(n * 1.05) * 0.95, (n % 3) * 0.45 - 0.45, Math.sin(n * 1.05) * 0.95);
-      fish.rotation.y = -n * 1.05;
-      swimmers.add(fish);
-    }
-    group.add(tank, swimmers);
-    group.userData.swimmers = swimmers;
-  } else if (kind === "greenhouse") {
-    // A greenhouse: a glass room full of planters
-    domeShape(group, { glass: true, band: 0x5ac84a }, part.on);
-    for (let k = 0; k < 4; k++) {
-      const x = Math.cos(k * 1.571 + 0.78) * 1.7, z = Math.sin(k * 1.571 + 0.78) * 1.7;
-      box(1.5, 0.5, 1.5, 0x8a5a36, x, 0.3, z, group);
-      for (let n = 0; n < 3; n++) {
-        const frond = new THREE.Mesh(CONE, paint(n % 2 ? 0x6ac84a : 0x4aa83a));
-        frond.scale.set(0.16, 1.3 + n * 0.3, 0.16);
-        frond.position.set(x + (n - 1) * 0.4, 1.2 + n * 0.15, z);
-        group.add(frond);
-      }
-    }
+    // A room is an empty box. Whatever is inside it, you built there yourself.
+    roomShape(group, part, { glass: kind === "glassdome" });
+    group.userData.spin = [];
+    for (const item of part.items || []) group.add(makeItem(item, group.userData.spin));
+    addFab(group, part, group.userData.spin);
   } else if (kind === "lookout") {
-    // A lookout: a tall tower with a glass ball on top
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.2, 8.4, 16, 1, true), new THREE.MeshLambertMaterial({ color: 0xaab8cc, side: THREE.DoubleSide, emissive: 0x10161e }));
-    tower.position.y = 4.2;
-    const top = new THREE.Mesh(new THREE.SphereGeometry(2.8, 20, 14), glassPaint());
-    top.position.y = 9.4;
-    const deck = new THREE.Mesh(new THREE.TorusGeometry(2.45, 0.2, 8, 24), paint(0xf2c02a));          // (a ring below eye level, so it doesn't spoil the view)
-    deck.rotation.x = Math.PI / 2;
-    deck.position.y = 8;
-    const footing = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.6, 4, 16), paint(0x8a94a6));
-    footing.position.y = -2;
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 8), glowPaint(0xff5a5a));
-    lamp.position.y = 12.5;
-    const loft = new THREE.Mesh(new THREE.CircleGeometry(2.4, 18), new THREE.MeshLambertMaterial({ color: 0xc8a878, side: THREE.DoubleSide }));       // the floor of the room at the top
-    loft.rotation.x = -Math.PI / 2;
-    loft.position.y = 8;
-    const ground = loft.clone();
-    ground.position.y = 0.06;
-    group.add(tower, top, deck, footing, lamp, loft, ground);
-    for (let k = 0; k < 4; k++) box(0.5, 0.12, 0.12, 0xd8dce6, 0, 1 + k * 2, 1.7, group);       // rungs up the inside
-  } else if (kind === "poles") {
-    // Four tall poles holding up a platform: build a room on top
-    const deck = new THREE.Mesh(new THREE.CylinderGeometry(3.9, 3.9, 0.4, 22), paint(0x8a94a6));
-    deck.position.y = 5.8;
-    group.add(deck);
-    for (let k = 0; k < 4; k++) {
-      const x = Math.cos(k * 1.571 + 0.78) * 2.9, z = Math.sin(k * 1.571 + 0.78) * 2.9;
-      box(0.4, 10, 0.4, 0x5a6070, x, 1, z, group);
-      box(0.9, 0.3, 0.9, 0xf2c02a, x, 5.5, z, group);
+    // A lookout: a tall square tower with a glass room on top
+    addWalls(group, part, 3, 14, wallPaint());
+    addWalls(group, null, 4.5, 5, glassPaint(), 14);
+    box(9.3, 0.25, 9.3, glassPaint(), 0, 19.1, 0, group);
+    box(9, 0.2, 9, 0x8e98aa, 0, 13.96, 0, group);                     // the floor of the room at the top
+    box(6, 0.12, 6, 0x8e98aa, 0, 0.02, 0, group);
+    box(6.6, 8, 6.6, 0x7a8698, 0, -4.05, 0, group);
+    for (const x of [-4.5, 4.5]) for (const z of [-4.5, 4.5]) box(0.4, 5.4, 0.4, 0xf2c02a, x, 16.5, z, group);
+    for (const y of [14.05, 19.1]) for (const side of [-4.5, 4.5]) {
+      box(9, 0.3, 0.3, 0xf2c02a, 0, y, side, group);
+      box(0.3, 0.3, 9, 0xf2c02a, side, y, 0, group);
     }
-    for (const turn of [0.78, 2.35]) box(8.2, 0.2, 0.2, 0x5a6070, 0, 3, 0, group).rotation.y = turn;
+    for (const x of [-3, 3]) for (const z of [-3, 3]) box(0.4, 14, 0.4, 0x5a6880, x, 7, z, group);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), glowPaint(0xff5a5a));
+    lamp.position.y = 19.7;
+    group.add(lamp);
+    for (let k = 0; k < 9; k++) box(0.8, 0.14, 0.14, 0xf2c02a, -2.3, 1 + k * 1.5, -2.3, group).rotation.y = Math.PI / 4;       // rungs up one corner
+    box(1.6, 0.9, 0.7, 0x5a6070, 3.4, 14.5, -3.4, group);             // a desk with a spyglass, up in the glass room
+    box(0.2, 0.2, 1.2, 0xf2c02a, 3.4, 15.2, -3.4, group).rotation.x = -0.4;
+    addHatch(group, part);
+    addFab(group, part, []);
+  } else if (kind === "poles") {
+    // Tall poles holding up a wide square platform: build a room on top
+    box(ROOM * 2 + 1.2, 0.5, ROOM * 2 + 1.2, 0x7a8698, 0, 5.5, 0, group);
+    for (const x of [-ROOM, 0, ROOM]) for (const z of [-ROOM, 0, ROOM]) {
+      if (x === 0 && z === 0) continue;
+      box(0.6, 12, 0.6, 0x5a6070, x * 0.94, -0.5, z * 0.94, group);
+      box(1.2, 0.4, 1.2, 0xf2c02a, x * 0.94, 5.1, z * 0.94, group);
+    }
+    for (const side of [-ROOM * 0.94, ROOM * 0.94]) {
+      box(ROOM * 2, 0.3, 0.3, 0x5a6070, 0, 2.6, side, group);
+      box(0.3, 0.3, ROOM * 2, 0x5a6070, side, 2.6, 0, group);
+    }
+  } else if (kind === "beacon") {
+    // A beacon: a flashing ball on a pole, with a tall thin beam of light that you can see from far away
+    box(0.2, 4, 0.2, 0x5a6070, 0, 2, 0, group);
+    box(1, 0.3, 1, 0xff7a2a, 0, 0.15, 0, group);
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff5ad0, fog: false }));
+    ball.position.y = 4.3;
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 90, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0xff7ae0, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    beam.position.y = 49;
+    group.add(ball, beam);
+    group.userData.flash = [ball, beam];
+  } else if (kind === "solar") {
+    // A solar panel: a dark blue sheet on a pole, tilted up towards the sun
+    box(0.25, 2.6, 0.25, 0x5a6070, 0, 1.3, 0, group);
+    box(1, 0.3, 1, 0x5a6070, 0, 0.15, 0, group);
+    const sheet = new THREE.Group();
+    sheet.position.y = 2.7;
+    sheet.rotation.x = -0.35;
+    box(3.6, 0.12, 2.4, new THREE.MeshPhongMaterial({ color: 0x1a3a8a, shininess: 140, specular: 0xaaccff }), 0, 0, 0, sheet);
+    for (const x of [-1.2, 0, 1.2]) box(0.05, 0.14, 2.4, 0xd8dce6, x, 0, 0, sheet);
+    for (const z of [-0.6, 0.6]) box(3.6, 0.14, 0.05, 0xd8dce6, 0, 0, z, sheet);
+    group.add(sheet);
+  } else if (kind === "thermal") {
+    // A vent generator: it turns the heat of a hot vent into power
+    box(2.2, 1.4, 2.2, 0x4a4e5a, 0, 0.7, 0, group);
+    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.16, 8, 20), glowPaint(0xff7a2a));
+    coil.rotation.x = Math.PI / 2;
+    coil.position.y = 1.55;
+    group.add(coil);
+    box(0.3, 2.6, 0.3, 0x5a6070, 0.8, 1.3, 0.8, group);
+    box(0.4, 0.4, 0.4, glowPaint(0xffe14a), 0.8, 2.7, 0.8, group);
   } else if (kind === "lamp") {
     box(0.22, 3.4, 0.22, 0x5a6070, 0, 1.7, 0, group);
     box(0.9, 0.3, 0.9, 0x5a6070, 0, 0.15, 0, group);
@@ -878,28 +1229,50 @@ function makePart(part) {
   }
   return group;
 }
-// A tunnel: a glass tube with yellow hoops, stretched between the doors of two rooms
+// A tunnel: a wide glass tube with yellow hoops, stretched between the walls of two rooms, with a walkway along the bottom
 function makeTunnel(tunnel) {
-  const from = new THREE.Vector3(tunnel.ax, tunnel.ay, tunnel.az), to = new THREE.Vector3(tunnel.bx, tunnel.by, tunnel.bz), long = from.distanceTo(to);
+  const span = spanOf(tunnel), from = new THREE.Vector3(span.ax, span.ay, span.az), to = new THREE.Vector3(span.bx, span.by, span.bz);
+  const along = to.clone().sub(from).normalize(), long = Math.max(0.5, from.distanceTo(to));
   const group = new THREE.Group();
   group.position.copy(from).add(to).multiplyScalar(0.5);
-  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
-  group.add(new THREE.Mesh(new THREE.CylinderGeometry(1.45, 1.45, long, 14, 1, true), glassPaint()));
-  for (let at = -long / 2 + 1.5; at < long / 2; at += 3) {
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.1, 6, 18), paint(0xf2c02a));
+  group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), along);
+  group.add(new THREE.Mesh(new THREE.CylinderGeometry(TUBE, TUBE, long, 18, 1, true), glassPaint()));
+  for (let at = -long / 2 + 2; at < long / 2; at += 4) {
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(TUBE + 0.05, 0.14, 6, 22), paint(0xf2c02a));
     hoop.rotation.x = Math.PI / 2;
     hoop.position.y = at;
     group.add(hoop);
   }
-  // A flat walkway along the bottom of the tube, to stand on
-  const whole = new THREE.Group(), path = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, long), paint(0xc8a878));
+  const whole = new THREE.Group(), path = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.12, long), paint(0xb8c0cc));
   path.position.copy(group.position);
-  path.position.y -= 1.3;
-  path.lookAt(to.x, to.y - 1.3, to.z);
+  path.position.y -= 1.7;
+  path.lookAt(to.x, to.y - 1.7, to.z);
   whole.add(group, path);
   return whole;
 }
+// Plants, rocks and treasures are hidden while a room stands on top of them (and come back if you pack the room up)
+function clearGround() {
+  const rooms = state.base.filter((part) => isRoom(part) && !part.on);
+  const under = (at) => rooms.some((room) => Math.max(Math.abs(room.x - at.x), Math.abs(room.z - at.z)) < halfOf(room) + 1.2);
+  for (const list of Object.values(decor).concat([loot])) for (const at of list) {
+    const covered = under(at);
+    if (covered === Boolean(at.covered)) continue;
+    at.covered = covered;
+    if (list === loot) at.taken = covered;
+    for (const each of at.drawn || []) {
+      lootHelper.position.set(at.x, at.y + each.lift, at.z);
+      lootHelper.rotation.set(0, at.turn, 0);
+      lootHelper.scale.set(each.wide, each.high, each.wide).multiplyScalar(covered ? 0.0001 : 1);
+      lootHelper.updateMatrix();
+      each.mesh.setMatrixAt(each.slot, lootHelper.matrix);
+      each.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+}
 function rebuildBase() {
+  clearGround();
+  spans.clear();
+  screens.length = 0;
   for (const model of baseModels) scene.remove(model);
   baseModels.length = 0;
   for (const part of state.base) {
@@ -915,65 +1288,164 @@ function rebuildBase() {
   }
 }
 const isRoom = (part) => Boolean(partOf(part.kind).room);
-const doorOf = (part) => ({ x: part.x, y: part.y + 1.2, z: part.z });         // where a tunnel joins a room
-// Are you inside one of your rooms? (It gives back the room, or null.) A lookout counts all the way up its tower.
-function roomHere() {
-  if (player.inSub) return null;
+// A tunnel is remembered by the two rooms it joins (the middle of each). The tube itself only runs from the wall of one room to the wall of the other,
+// so at each end its floor is level with that room's floor. spanOf works out where the tube starts and ends.
+const spans = new Map();
+function spanOf(tunnel) {
+  if (spans.has(tunnel)) return spans.get(tunnel);
+  const dx = tunnel.bx - tunnel.ax, dz = tunnel.bz - tunnel.az, flat = Math.hypot(dx, dz) || 1, big = Math.max(Math.abs(dx), Math.abs(dz)) / flat;
+  const wallOf = function (x, z) {         // how far it is from the middle of that room to its wall, going along the tunnel (the tube starts just inside the wall)
+    const room = state.base.find((part) => isRoom(part) && part.x === x && part.z === z);
+    return ((room ? halfOf(room) : ROOM) - 0.45) / big;
+  };
+  const a = wallOf(tunnel.ax, tunnel.az), b = wallOf(tunnel.bx, tunnel.bz);
+  const span = { ax: tunnel.ax + (dx / flat) * a, ay: tunnel.ay, az: tunnel.az + (dz / flat) * a, bx: tunnel.bx - (dx / flat) * b, by: tunnel.by, bz: tunnel.bz - (dz / flat) * b };
+  spans.set(tunnel, span);
+  return span;
+}
+const doorOf = (part) => ({ x: part.x, y: part.y + 1.7, z: part.z });         // where a tunnel joins a room: the middle of the tube is 1.7 metres above the floor, so its walkway is level with the floor
+// Is a place inside one of your rooms? (It gives back the room, or null.) A lookout counts all the way up its tower and in the glass room on top.
+function roomAt(x, y, z) {
   for (const part of state.base) {
     if (!isRoom(part)) continue;
-    if (part.kind === "lookout" ? Math.hypot(part.x - player.x, part.z - player.z) < 2.5 && player.y > part.y - 0.5 && player.y < part.y + 11.8 : Math.hypot(part.x - player.x, part.y + 1.2 - player.y, part.z - player.z) < 3.3) return part;
+    const dx = Math.abs(x - part.x), dz = Math.abs(z - part.z), up = y - part.y;
+    if (part.kind === "lookout" ? up > -0.5 && ((dx < 2.75 && dz < 2.75 && up < 14.6) || (dx < 4.25 && dz < 4.25 && up >= 14 && up < 18.9)) : dx < ROOM - 0.25 && dz < ROOM - 0.25 && up > -0.5 && up < HIGH - 0.1) return part;
   }
   return null;
 }
+let inBase = false;          // true once you have climbed in through a hatch, until you climb out again
+const roomHere = () => (inBase && !player.inSub ? roomAt(player.x, player.y, player.z) : null);
 // How far is a point from the middle line of a tunnel?
 function tunnelGap(tunnel, x, y, z) {
-  const dx = tunnel.bx - tunnel.ax, dy = tunnel.by - tunnel.ay, dz = tunnel.bz - tunnel.az;
-  const along = clamp(((x - tunnel.ax) * dx + (y - tunnel.ay) * dy + (z - tunnel.az) * dz) / (dx * dx + dy * dy + dz * dz), 0, 1);
-  return Math.hypot(x - tunnel.ax - dx * along, y - tunnel.ay - dy * along, z - tunnel.az - dz * along);
+  const span = spanOf(tunnel), dx = span.bx - span.ax, dy = span.by - span.ay, dz = span.bz - span.az;
+  const along = clamp(((x - span.ax) * dx + (y - span.ay) * dy + (z - span.az) * dz) / (dx * dx + dy * dy + dz * dz || 1), 0, 1);
+  return Math.hypot(x - span.ax - dx * along, y - span.ay - dy * along, z - span.az - dz * along);
 }
-const tunnelHere = () => (player.inSub ? null : state.tunnels.find((tunnel) => tunnelGap(tunnel, player.x, player.y, player.z) < 1.5) || null);
-const indoors = () => Boolean(roomHere() || tunnelHere());       // in a room or a tunnel: there is air, and you are safe
+const tunnelAt = (x, y, z) => state.tunnels.find((tunnel) => tunnelGap(tunnel, x, y, z) < TUBE - 0.3) || null;
+const tunnelHere = () => (inBase && !player.inSub ? tunnelAt(player.x, player.y, player.z) : null);
+// Go in or out through a room's hatch
+function useHatch(part) {
+  const hatch = hatchOf(part);
+  inBase = !inBase;
+  if (inBase) Object.assign(player, { x: hatch.x - hatch.nx * 1.5, y: part.y + 1.6, z: hatch.z - hatch.nz * 1.5 });
+  else Object.assign(player, { x: hatch.x + hatch.nx * 1.7, y: hatch.y, z: hatch.z + hatch.nz * 1.7 });
+  Object.assign(player, { vx: 0, vy: 0, vz: 0 });
+  sfx.make();
+  if (inBase) toast("Clunk! The hatch shuts behind you. In here there is air: you stand and walk. E by the hatch: go back out.", 5);
+  else sfx.splash();
+}
+// The walls of your base are solid. From outside you can't swim (or steer the Bubble) through a room, a platform or a tunnel.
+let bumped = 0;
+function keepOut() {
+  const pad = player.inSub ? 2 : 0.45;
+  let hit = false;
+  const block = function (part, half, low, top, open) {           // (open: you can also be pushed out underneath)
+    const dx = player.x - part.x, dz = player.z - part.z;
+    if (Math.abs(dx) >= half + pad || Math.abs(dz) >= half + pad || player.y <= low - pad || player.y >= top + pad) return;
+    const ways = [[half + pad - Math.abs(dx), "x"], [half + pad - Math.abs(dz), "z"], [top + pad - player.y, "up"]];
+    if (open) ways.push([player.y - (low - pad), "down"]);
+    const way = ways.sort((a, b) => a[0] - b[0])[0][1];
+    if (way === "x") [player.x, player.vx] = [part.x + Math.sign(dx || 1) * (half + pad), 0];
+    else if (way === "z") [player.z, player.vz] = [part.z + Math.sign(dz || 1) * (half + pad), 0];
+    else if (way === "up") [player.y, player.vy] = [top + pad, Math.max(0, player.vy)];
+    else [player.y, player.vy] = [low - pad, Math.min(0, player.vy)];
+    hit = hit || isRoom(part);
+  };
+  for (const part of state.base) {
+    if (part.kind === "lookout") {
+      block(part, 3, part.y - 8, part.y + 13.8, false);
+      block(part, 4.5, part.y + 13.8, part.y + 19.3, true);
+    } else if (isRoom(part)) block(part, ROOM, part.y - (part.on ? 0.2 : 9), part.y + HIGH + 0.3, part.on);
+    else if (part.kind === "poles") block(part, ROOM + 0.6, part.y + 5.25, part.y + 5.8, true);
+  }
+  for (const tunnel of state.tunnels) {
+    const span = spanOf(tunnel), dx = span.bx - span.ax, dy = span.by - span.ay, dz = span.bz - span.az;
+    const along = clamp(((player.x - span.ax) * dx + (player.y - span.ay) * dy + (player.z - span.az) * dz) / (dx * dx + dy * dy + dz * dz || 1), 0, 1);
+    const ox = player.x - span.ax - dx * along, oy = player.y - span.ay - dy * along, oz = player.z - span.az - dz * along, gap = Math.hypot(ox, oy, oz) || 0.01;
+    if (gap < TUBE + pad) {
+      player.x += (ox / gap) * (TUBE + pad - gap);
+      player.y += (oy / gap) * (TUBE + pad - gap);
+      player.z += (oz / gap) * (TUBE + pad - gap);
+    }
+  }
+  if (hit && clock.value > bumped) {
+    bumped = clock.value + 12;
+    toast("The walls are solid. Find the round hatch with the green lights, and press E to go in.", 5);
+  }
+}
+const indoors = () => inBase && Boolean(roomHere() || tunnelHere());       // in a room or a tunnel: there is air, and you are safe
 // The see-through shape that shows where a new piece will go: green if it fits there, red if not
-const ghost = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 20), new THREE.MeshBasicMaterial({ color: 0x7affa0, transparent: true, opacity: 0.4, depthWrite: false, fog: false }));
+const GHOST_ROUND = new THREE.CylinderGeometry(1, 1, 1, 20), GHOST_SQUARE = new THREE.BoxGeometry(2, 1, 2);
+const ghost = new THREE.Mesh(GHOST_ROUND, new THREE.MeshBasicMaterial({ color: 0x7affa0, transparent: true, opacity: 0.4, depthWrite: false, fog: false }));
 ghost.visible = false;
 scene.add(ghost);
 // Where would the piece go? Just in front of you, on the sea bed (or on top of some poles). "why" says what is wrong, if anything.
 function buildSpot() {
-  const short = Object.keys(placing.needs).some((kind) => state.bag[kind] < placing.needs[kind]) ? "You don't have the materials any more." : "";
+  const short = placing.kit ? ((state.kits[placing.id] || 0) < 1 ? "You have none left. Make one at a fabricator." : "") : Object.keys(placing.needs).some((kind) => state.bag[kind] < placing.needs[kind]) ? "You don't have the materials any more." : "";
+  if (placing.item) {
+    // Something for inside a room goes on the floor just in front of you
+    const room = roomHere();
+    if (!room || room.kind === "lookout") return { x: player.x, y: player.y - 1.6, z: player.z, why: room ? "There is no space for it in the lookout tower." : "This is built indoors. Go inside a room first." };
+    const reach = ROOM - 1.1;
+    const x = clamp(Math.round((player.x - Math.sin(player.yaw) * 2.8) * 2) / 2, room.x - reach, room.x + reach), z = clamp(Math.round((player.z - Math.cos(player.yaw) * 2.8) * 2) / 2, room.z - reach, room.z + reach);
+    const hatch = hatchOf(room);
+    const why = short || (room.items.concat([fabOf(room)]).some((item) => Math.hypot(room.x + item.x - x, room.z + item.z - z) < 1.8) ? "Too close to something else in the room." : Math.hypot(hatch.x - x, hatch.z - z) < 2.6 ? "Not right in front of the hatch." : "");
+    return { x: x, y: room.y, z: z, why: why, room: room };
+  }
   if (placing.tunnel) {
     // A tunnel joins the room nearest to you to the room nearest to that one
     const rooms = state.base.filter(isRoom), near = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
     const joined = (a, b) => state.tunnels.some((t) => (t.ax === a.x && t.az === a.z && t.bx === b.x && t.bz === b.z) || (t.ax === b.x && t.az === b.z && t.bx === a.x && t.bz === a.z));
     const first = rooms.slice().sort((a, b) => near(a, player) - near(b, player))[0];
-    const second = first && rooms.filter((room) => room !== first && !joined(first, room) && near(room, first) < 36).sort((a, b) => near(a, first) - near(b, first))[0];
-    if (!second) return { x: player.x, y: player.y, z: player.z, why: rooms.length < 2 ? "Build two rooms first, then join them with a tunnel." : "No other room is close enough to join to this one (36 metres at most), or they are joined already." };
-    return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 + 1.2, z: (first.z + second.z) / 2, why: short, pair: [first, second] };
+    const second = first && rooms.filter((room) => room !== first && !joined(first, room) && near(room, first) < 70).sort((a, b) => near(a, first) - near(b, first))[0];
+    if (!second) return { x: player.x, y: player.y, z: player.z, why: rooms.length < 2 ? "Build two rooms first, then join them with a tunnel." : "No other room is close enough to join to this one (70 metres at most), or they are joined already." };
+    return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 + 1.7, z: (first.z + second.z) / 2, why: short, pair: [first, second] };
   }
-  let x = Math.round((player.x - Math.sin(player.yaw) * 8) / 2) * 2, z = Math.round((player.z - Math.cos(player.yaw) * 8) / 2) * 2, y = -depthAt(x, z);
-  const gap = (other) => Math.hypot(other.x - x, other.z - z);
+  const roomy = placing.room || placing.id === "poles", ahead = roomy ? ROOM + 6 : 8;          // (a room is big, so it goes a good way in front of you)
+  let x = Math.round((player.x - Math.sin(player.yaw) * ahead) / 2) * 2, z = Math.round((player.z - Math.cos(player.yaw) * ahead) / 2) * 2, y = -depthAt(x, z);
+  if (roomy) {
+    // A new room lines itself up with a room that is nearly in line with it, so the tunnel between them runs straight
+    const mate = state.base.filter((part) => isRoom(part) && Math.hypot(part.x - x, part.z - z) < 44).sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
+    if (mate && Math.abs(mate.x - x) < 7 && Math.abs(mate.z - z) > 7) x = mate.x;
+    else if (mate && Math.abs(mate.z - z) < 7 && Math.abs(mate.x - x) > 7) z = mate.z;
+    y = -depthAt(x, z);
+  }
+  const gap = (other) => Math.max(Math.abs(other.x - x), Math.abs(other.z - z));       // (rooms are square, so this is how far apart two of them are, wall to wall)
   // A room can stand on poles, if some are free just there
-  const poles = placing.room ? state.base.find((part) => part.kind === "poles" && !part.on && gap(part) < 4.5) : null;
+  const poles = placing.room ? state.base.find((part) => part.kind === "poles" && !part.on && gap(part) < ROOM) : null;
   if (poles) [x, y, z] = [poles.x, poles.y + 6, poles.z];
-  const roomy = placing.room || placing.id === "poles";
+  else if (placing.room) {
+    // The floor of a room is flat, so it sits on the highest bit of ground underneath it (no sand pokes up through the floor)
+    const reach = placing.id === "lookout" ? 3.2 : ROOM;
+    for (let ix = -2; ix <= 2; ix++) for (let iz = -2; iz <= 2; iz++) y = Math.max(y, -depthAt(x + (ix * reach) / 2, z + (iz * reach) / 2));
+    y += 0.25;
+  }
+  const wide = (part) => (isRoom(part) || part.kind === "poles" ? ROOM : 0);         // how much room a piece takes up
   let why = short;
-  if (Math.hypot(x, z) < 22) why = "Too close to your raft.";
+  if (Math.hypot(x, z) < 20 + (roomy ? ROOM : 0)) why = "Too close to your pod.";
   else if (Math.hypot(x, z) > WORLD - 20) why = "Too close to the edge of the sea.";
-  else if (state.base.some((part) => part !== poles && gap(part) < (roomy || isRoom(part) || part.kind === "poles" ? 7.5 : 3))) why = "Too close to another piece of your base.";
-  else if ([HEART, WRECK].concat(TABLETS).some((place) => gap(place) < 16)) why = "Not here: leave this place as it is.";
+  else if (state.base.some((part) => part !== poles && gap(part) < wide(part) + (roomy ? ROOM : 0) + 2)) why = "Too close to another piece of your base.";
+  else if ([HEART, WRECK].concat(TABLETS).some((place) => gap(place) < 14 + (roomy ? ROOM : 0))) why = "Not here: leave this place as it is.";
+  else if (placing.vent && !decor.vent.some((vent) => Math.hypot(vent.x - x, vent.z - z) < 30)) why = "It has to stand within 30 metres of a hot vent (they are in the Ember Vents).";
   return { x: x, y: y, z: z, why: why, poles: poles };
 }
 function placePart() {
   const at = buildSpot();
   if (at.why) return toast(at.why, 4);
-  for (const kind in placing.needs) state.bag[kind] -= placing.needs[kind];
-  if (at.pair) {
+  if (placing.kit) state.kits[placing.id]--;                     // (a piece you made at a fabricator)
+  else for (const kind in placing.needs) state.bag[kind] -= placing.needs[kind];
+  if (placing.item) {
+    at.room.items.push({ kind: placing.id, x: at.x - at.room.x, z: at.z - at.room.z, turn: Math.round(player.yaw / (Math.PI / 2)) * (Math.PI / 2), fish: 0, ripe: 0 });
+    toast("You built a " + placing.name.toLowerCase() + ". " + placing.does, 6);
+  } else if (at.pair) {
     const from = doorOf(at.pair[0]), to = doorOf(at.pair[1]);
     state.tunnels.push({ ax: from.x, ay: from.y, az: from.z, bx: to.x, by: to.y, bz: to.z });
     toast("You joined your " + partOf(at.pair[0].kind).name.toLowerCase() + " to your " + partOf(at.pair[1].kind).name.toLowerCase() + " with a tunnel. It is full of air: walk through!", 6);
   } else {
-    state.base.push({ kind: placing.id, x: at.x, y: at.y, z: at.z, ripe: 0, fish: 0, on: Boolean(at.poles) });
+    state.base.push({ kind: placing.id, x: at.x, y: at.y, z: at.z, ripe: 0, fish: 0, on: Boolean(at.poles), items: [] });
     if (at.poles) at.poles.on = true;
-    toast("You built a " + placing.name.toLowerCase() + (at.poles ? " on top of the poles" : "") + "! " + (placing.room ? "Swim inside and you will stand on its floor and breathe. E: use the room." : placing.does), 6);
+    if (placing.room) state.power = Math.min(powerCap(), state.power + 100);          // (a new room comes with a full battery)
+    toast("You built a " + placing.name.toLowerCase() + (at.poles ? " on top of the poles" : "") + "! " + (placing.id === "lookout" ? "Swim to its hatch (the round door with the green lights) and press E to go in." : placing.room ? "It is empty inside, apart from the fabricator on its wall. Go in by the hatch (the round door with the green lights), then press B to build things in it. Its battery is full, but it needs a solar panel to keep it that way: make one at a fabricator." : placing.id === "solar" ? placing.does + " Here it works at " + Math.round(solarShare(at) * 100) + "% of its full strength." : placing.does), 6);
   }
   rebuildBase();
   sfx.make();
@@ -981,20 +1453,45 @@ function placePart() {
   ghost.visible = false;
   save();
 }
-// X: pack up the nearest piece of your base (or the tunnel you are in). You get all its materials back.
+// Which piece of your base would X pack up? The tunnel you are touching, or else the piece you are closest to.
+// (Poles with a room on top can't be packed up: the room has to go first, so it is the room that is chosen.)
+function packTarget() {
+  const tunnel = state.tunnels.find((each) => tunnelGap(each, player.x, player.y, player.z) < TUBE + 1.6);
+  if (tunnel) return { tunnel: tunnel, name: "tunnel" };
+  const reach = (each) => (isRoom(each) ? halfOf(each) + 5 : each.kind === "poles" ? ROOM + 5 : 7);
+  const gap = (each) => Math.max(Math.abs(each.x - player.x), Math.abs(each.z - player.z));
+  const part = state.base.filter((each) => !(each.kind === "poles" && each.on) && gap(each) < reach(each) && Math.abs(each.y - player.y) < 26).sort((a, b) => gap(a) - reach(a) - (gap(b) - reach(b)))[0];
+  return part ? { part: part, name: partOf(part.kind).name.toLowerCase() } : null;
+}
+// X: pack up a piece of your base. You get all its materials back (and everything that was inside a room).
 function packUp() {
   const refund = (kind) => Object.keys(kind.needs).forEach((material) => (state.bag[material] += kind.needs[material]));
-  const tunnel = state.tunnels.find((each) => tunnelGap(each, player.x, player.y, player.z) < 2.6);
-  const part = state.base.filter((each) => Math.hypot(each.x - player.x, each.y - player.y, each.z - player.z) < 7).sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z))[0];
-  if (tunnel && !roomHere()) {
+  if (inBase) {
+    // Indoors: pack up the thing you are standing next to
+    const room = roomHere(), item = room && itemNear(room);
+    if (!item) return toast("Stand next to something to pack it up. (To pack up a whole room, go outside first.)", 4);
+    if (item.fixed) return toast("The fabricator is built into the wall: it is part of the room.", 4);
+    refund(itemOf(item.kind));
+    if (item.fish) state.bag.fish += item.fish;
+    room.items.splice(room.items.indexOf(item), 1);
+    toast("You packed up the " + itemOf(item.kind).name.toLowerCase() + " and got its materials back.", 4);
+    rebuildBase();
+    sfx.pick();
+    return save();
+  }
+  const target = packTarget(), tunnel = target && target.tunnel, part = target && target.part;
+  if (tunnel) {
     state.tunnels.splice(state.tunnels.indexOf(tunnel), 1);
     refund(partOf("tunnel"));
     toast("You packed up the tunnel and got its materials back.", 4);
   } else if (part) {
     const kind = partOf(part.kind);
-    if (part.kind === "poles" && part.on) return toast("There is a room on top of these poles. Pack the room up first.", 4);
-    if (part.fish) state.bag.fish += part.fish;                  // (the fish from an aquarium go back in your bag)
-    refund(kind);
+    for (const item of part.items || []) {                       // (everything inside a room is packed up with it)
+      refund(itemOf(item.kind));
+      state.bag.fish += item.fish || 0;
+    }
+    if (kind.kit) state.kits[part.kind] = (state.kits[part.kind] || 0) + 1;         // (a piece made at a fabricator goes back in your bag whole, ready to put down again)
+    else refund(kind);
     state.base.splice(state.base.indexOf(part), 1);
     // A room that goes takes its tunnels with it, and leaves its poles free again
     for (const each of state.tunnels.filter((t) => (t.ax === part.x && t.az === part.z) || (t.bx === part.x && t.bz === part.z))) {
@@ -1002,11 +1499,18 @@ function packUp() {
       refund(partOf("tunnel"));
     }
     if (part.on) for (const each of state.base) if (each.kind === "poles" && each.x === part.x && each.z === part.z) each.on = false;
-    toast("You packed up the " + kind.name.toLowerCase() + " and got its materials back.", 4);
-  } else return;
+    toast("You packed up the " + kind.name.toLowerCase() + (kind.kit ? ". It is ready to put down somewhere else (B)." : " and got its materials back."), 4);
+  } else return toast("Nothing to pack up here. Swim right up to a piece of your base, then press X.", 4);
+  state.power = Math.min(state.power, powerCap());
   rebuildBase();
   sfx.pick();
   save();
+}
+const itemOf = (id) => ROOM_ITEMS.find((item) => item.id === id);
+// The thing in this room that you are standing nearest to (if it is close enough to touch)
+function itemNear(room) {
+  const gap = (item) => Math.hypot(room.x + item.x - player.x, room.z + item.z - player.z);
+  return (room.items || []).concat([fabOf(room)]).filter((item) => gap(item) < 2.7 && player.y < room.y + 4).sort((a, b) => gap(a) - gap(b))[0] || null;
 }
 function toggleBuild() {
   const page = el("build");
@@ -1016,15 +1520,19 @@ function toggleBuild() {
   if (document.pointerLockElement) document.exitPointerLock();
   const list = el("parts");
   list.innerHTML = "";
-  for (const part of BASE_PARTS) {
+  // Indoors you build the things that go inside a room. Out in the sea you build the rooms themselves, and everything else.
+  el("build-title").textContent = inBase ? "Build inside this room" : "Build your base";
+  el("build-note").textContent = inBase ? "Pick something, then look at the floor where you want it and press E. Press X next to a thing to pack it up again (you get everything back)." : "Pick a piece, then point at the sea bed in front of you and press E. Press X next to a piece to pack it up again (you get everything back). To build things INSIDE a room, go in through its hatch first.";
+  for (const part of inBase ? ROOM_ITEMS : BASE_PARTS) {
     const button = document.createElement("button");
     button.className = "recipe";
-    button.disabled = !Object.keys(part.needs).every((kind) => state.bag[kind] >= part.needs[kind]);
-    button.innerHTML = "<b>" + part.name + "</b><br>" + part.does + "<br>Needs: " + Object.keys(part.needs).map((kind) => '<span class="' + (state.bag[kind] >= part.needs[kind] ? "ok" : "short") + '">' + part.needs[kind] + " " + LOOT[kind].name.toLowerCase() + "</span>").join(", ");
+    const have = state.kits[part.id] || 0;
+    button.disabled = part.kit ? have < 1 : !Object.keys(part.needs).every((kind) => state.bag[kind] >= part.needs[kind]);
+    button.innerHTML = "<b>" + part.name + "</b>" + (part.kit ? " (you have " + have + ")" : "") + "<br>" + part.does + "<br>" + (part.kit ? (have ? "Made and ready to put down." : '<span class="short">Make one at a fabricator first.</span>') : "Needs: " + Object.keys(part.needs).map((kind) => '<span class="' + (state.bag[kind] >= part.needs[kind] ? "ok" : "short") + '">' + part.needs[kind] + " " + LOOT[kind].name.toLowerCase() + "</span>").join(", "));
     button.addEventListener("click", function () {
       placing = part;
       page.hidden = true;
-      toast(part.tunnel ? "Swim close to one of the two rooms you want to join, then press E (or click). Esc: cancel." : "Point at a flat bit of sea bed in front of you" + (part.room ? " (or at some poles)" : "") + ". E or click: build it there. Esc: cancel.", 7);
+      toast(part.item ? "Look at the floor where you want it. E or click: build it there. Esc: cancel." : part.tunnel ? "Swim close to one of the two rooms you want to join, then press E (or click). Esc: cancel." : "Point at a flat bit of sea bed in front of you" + (part.room ? " (or at some poles)" : "") + ". E or click: build it there. Esc: cancel.", 7);
       if (!TEST) canvas.requestPointerLock();
     });
     list.appendChild(button);
@@ -1032,7 +1540,7 @@ function toggleBuild() {
 }
 
 // ----- Fish for supper -----
-// The Net catches small fish. A kitchen's oven cooks them. A cooked fish makes you strong: it mends you, and for a while you use less air.
+// The Net catches small fish. An oven (or your pod's fabricator) cooks them. A cooked fish makes you strong: it mends you, and for a while you use less air.
 let fedUntil = 0;
 for (const [kind, meat] of [["sunnyfin", 1], ["stripetail", 1], ["glowfry", 1], ["darter", 1], ["cinderfin", 1], ["drifter", 3]]) SPECIES[kind].meat = meat;
 function swingNet() {
@@ -1047,15 +1555,45 @@ function swingNet() {
   best.gone = 50;                         // (another one will take its place in a while)
   state.bag.fish += best.spec.meat;
   sfx.pick();
-  toast("You caught a " + best.spec.name + "! +" + best.spec.meat + " raw fish (you have " + state.bag.fish + "). Cook it in a kitchen.", 4);
+  toast("You caught a " + best.spec.name + "! +" + best.spec.meat + " raw fish (you have " + state.bag.fish + "). Cook it at your pod's fabricator, or in an oven in your base.", 4);
+}
+// V: drink a bottle of water. H: use a first aid kit.
+function drinkWater() {
+  if (state.bag.water < 1) return toast("You have no water in your bag. Make a bottle at a fabricator (it squeezes fresh water out of kelp).", 4);
+  state.bag.water--;
+  state.water = Math.min(100, state.water + 50);
+  sfx.pick();
+  toast("Glug, glug. That's better! (You have " + state.bag.water + " more.)", 3);
+}
+function firstAid() {
+  if (state.bag.medkit < 1) return toast("You have no first aid kit in your bag. Make one at a fabricator.", 4);
+  if (player.hp >= 100) return toast("You are not hurt. Save it for later!", 3);
+  state.bag.medkit--;
+  player.hp = Math.min(100, player.hp + 60);
+  sfx.make();
+  toast("You patch yourself up with the first aid kit. (You have " + state.bag.medkit + " more.)", 3);
+}
+// You get hungry and thirsty as time goes by. If either runs right out, you slowly lose health.
+let hungerWarn = 0;
+function getHungry(dt) {
+  state.food = Math.max(0, state.food - dt / 7.2);              // (a full tummy lasts 12 minutes)
+  state.water = Math.max(0, state.water - dt / 5.4);            // (and a long drink lasts 9)
+  if (state.food <= 0 || state.water <= 0) player.hp -= dt * 1.2;
+  const low = state.food < 20 ? (state.food <= 0 ? "You are starving! " : "You are getting hungry. ") + "Eat a cooked fish (G)." : state.water < 20 ? (state.water <= 0 ? "You are parched! " : "You are getting thirsty. ") + "Drink some water (V)." : "";
+  if (low && clock.value > hungerWarn) {
+    hungerWarn = clock.value + (state.food <= 0 || state.water <= 0 ? 8 : 25);
+    sfx.warn();
+    toast(low, 4);
+  }
 }
 function eatFish() {
-  if (state.bag.cooked < 1) return toast(state.bag.fish > 0 ? "Raw fish? Yuck! Cook it in the oven of a kitchen first." : "You have no fish. Catch some with the Net, then cook it in a kitchen.", 4);
+  if (state.bag.cooked < 1) return toast(state.bag.fish > 0 ? "Raw fish? Yuck! Cook it first, at the fabricator in your pod or in an oven in your base." : "You have no cooked fish in your bag. Catch some with the Net, then cook it at your pod's fabricator or in an oven in your base.", 4);
   state.bag.cooked--;
-  player.hp = Math.min(100, player.hp + 40);
+  state.food = Math.min(100, state.food + 45);
+  player.hp = Math.min(100, player.hp + 20);
   fedUntil = clock.value + 180;
   sfx.make();
-  toast("Delicious! You feel much stronger, and for the next three minutes you will use less air.", 5);
+  toast("Delicious! You are not so hungry now, and for the next three minutes you will use less air.", 5);
 }
 
 // ----- Your hands, and the tools in them -----
@@ -1065,13 +1603,38 @@ const TOOLS = [
   { id: "scanner", name: "Scanner", tip: "Hold the mouse button on a creature to scan it." },
   { id: "net", name: "Net", tip: "Click: catch a small fish that is close in front of you." },
   { id: "builder", name: "Builder", tip: "Click: choose a piece of base, then click again to build it." },
+  { id: "knife", name: "Knife", tip: "Click: jab at a creature right in front of you. A hunter that gets jabbed swims away.", gear: "knife" },
 ];
+// Do you have this tool? (You have to make the knife before you can hold it.)
+const hasTool = (each) => !each.gear || Boolean(state.gear[each.gear]);
+// Jab with the knife: small hunters flee, little fish dart away, and a leviathan doesn't even notice
+function jab() {
+  if (player.inSub) return toast("You can't use the knife from inside the Bubble.", 3);
+  const way = lookWay();
+  let best = null, bestFar = 99;
+  for (const c of creatures) {
+    if (c.gone > 0 || c.far > 3.4 + c.spec.size * 1.2 || c.far > bestFar) continue;
+    if (((c.x - player.x) * way[0] + (c.y - player.y) * way[1] + (c.z - player.z) * way[2]) / (c.far || 1) > 0.5) [best, bestFar] = [c, c.far];
+  }
+  sfx.pick();
+  if (!best) return;
+  if (best.spec.levi) return toast("Your little knife doesn't bother the " + best.spec.name + " one bit!", 3);
+  best.scare = clock.value + 10;
+  best.timer = 0;
+  shake = 0.15;
+  toast(best.spec.hunter ? "Jab! The " + best.spec.name + " flinches and swims away." : "The " + best.spec.name + " darts away.", 3);
+}
 let tool = 0, swing = 0, stroke = 0;
 function drawTools() {
-  el("tools").innerHTML = TOOLS.map((each, n) => '<span class="' + (n === tool ? "picked" : "") + '">' + (n + 1) + " " + each.name + "</span>").join("");
+  el("tools").innerHTML = TOOLS.map((each, n) => '<span class="' + (n === tool ? "picked" : hasTool(each) ? "" : "none") + '">' + (n + 1) + " " + each.name + "</span>").join("");
 }
-function pickTool(n) {
-  tool = (n + TOOLS.length) % TOOLS.length;
+function pickTool(n, step) {
+  n = (n + TOOLS.length) % TOOLS.length;
+  if (!hasTool(TOOLS[n])) {
+    if (step) return pickTool(n + step, step);            // (the mouse wheel skips a tool you don't have)
+    return toast("You have no dive knife yet. Make one at a fabricator.", 3);
+  }
+  tool = n;
   scanning = false;
   drawTools();
   toast(TOOLS[tool].name + ". " + TOOLS[tool].tip, 3);
@@ -1083,6 +1646,7 @@ function useTool() {
   else if (id === "hands") interact();
   else if (id === "scanner") scanning = true;
   else if (id === "net") swingNet();
+  else if (id === "knife") jab();
   else toggleBuild();
 }
 // Your arms are drawn on top of everything else, with their own little camera
@@ -1121,8 +1685,12 @@ const toolModels = (function () {
   box(0.09, 0.13, 0.24, lit(0xf2c02a), 0, 0.08, -0.22, builder);
   box(0.05, 0.05, 0.14, lit(0x5a6070), 0, 0.1, -0.4, builder);
   box(0.03, 0.03, 0.03, glowPaint(0x7ad8ff), 0, 0.1, -0.48, builder);
-  for (const model of [scanner, net, builder]) arms[1].add(model);
-  return { scanner: scanner, net: net, builder: builder };
+  const knife = new THREE.Group();
+  box(0.035, 0.035, 0.14, lit(0x2a2e3a), 0, 0.06, -0.2, knife);
+  box(0.09, 0.02, 0.02, lit(0xf2c02a), 0, 0.06, -0.28, knife);
+  box(0.012, 0.045, 0.26, new THREE.MeshPhongMaterial({ color: 0xe8eef6, shininess: 160 }), 0, 0.06, -0.42, knife);
+  for (const model of [scanner, net, builder, knife]) arms[1].add(model);
+  return { scanner: scanner, net: net, builder: builder, knife: knife };
 })();
 function updateHands(dt, light) {
   const shown = mode === "swim" && !player.inSub && !card;
@@ -1162,8 +1730,9 @@ function hullHit(amount, name) {
   for (const kind in state.bag) state.bag[kind] = Math.ceil(state.bag[kind] / 2);
   Object.assign(state, { hull: 40, subAt: null });
   player.inSub = false;
+  const lost = lostCount();
   goToRaft();
-  showCard(["CRACK! The " + name + " splits the Bubble's hull. Water rushes in...", "You wake up on your raft. The battered Bubble has bobbed up beside you, and the sea kept half of what you were carrying.", "Rest until morning to mend the hull. A sea whistle, a pearl booster or a Titan hull would help next time!"]);
+  showCard(["CRACK! The " + name + " splits the Bubble's hull. Water rushes in...", "You wake up in your pod. The battered Bubble has bobbed up beside you, and the sea kept half of what you were carrying." + lost, "Rest in your pod to mend the hull. A sea whistle, a pearl booster or a Titan hull would help next time!"]);
 }
 
 // ----- Keyboard and mouse -----
@@ -1187,8 +1756,10 @@ document.addEventListener("keydown", function (event) {
   }
   if (event.code.startsWith("Digit") && Number(event.code.slice(5)) >= 1 && Number(event.code.slice(5)) <= TOOLS.length) pickTool(Number(event.code.slice(5)) - 1);
   if (event.code === "KeyG") eatFish();
+  if (event.code === "KeyV") drinkWater();
+  if (event.code === "KeyH") firstAid();
   if (event.code === "KeyT") {
-    if (!state.gear.torch) toast("You have no torch yet. Make one at the raft.", 3);
+    if (!state.gear.torch) toast("You have no torch yet. Make one at your pod.", 3);
     else {
       torchOn = !torchOn;
       sfx.pick();
@@ -1207,7 +1778,7 @@ document.addEventListener("mouseup", () => (scanning = false));
 canvas.addEventListener("wheel", function (event) {            // the mouse wheel changes your tool
   if (mode !== "swim" || card) return;
   event.preventDefault();
-  pickTool(tool + (event.deltaY > 0 ? 1 : -1));
+  pickTool(tool + (event.deltaY > 0 ? 1 : -1), event.deltaY > 0 ? 1 : -1);
 }, { passive: false });
 document.addEventListener("contextmenu", (event) => event.preventDefault());
 document.addEventListener("mousemove", function (event) {
@@ -1231,25 +1802,32 @@ function hurt(amount, why) {
   for (const kind in state.bag) state.bag[kind] = Math.ceil(state.bag[kind] / 2);
   state.subAt = null;
   player.inSub = false;
+  const lost = lostCount();
+  [state.food, state.water] = [Math.max(state.food, 50), Math.max(state.water, 50)];
   goToRaft();
-  showCard(["Everything goes dark...", "You wake up on your raft, coughing. A friendly current must have carried you home.", "The sea kept half of what you were carrying. Next time, turn back while you still have plenty of air!"]);
+  showCard(["Everything goes dark...", "You wake up in your pod, coughing. A friendly current must have carried you home.", "The sea kept half of what you were carrying (but everything in your pod locker is safe)." + lost + " Next time, turn back while you still have plenty of air!"]);
 }
 
-// ----- The raft: your home, and your workshop -----
-// Stop and rest: on the raft, or (if you say which room) inside your base
-function goToRaft(room) {
+// ----- The pod: your home, and your workshop -----
+// Stop and rest: in the pod, or (if you say which room) inside your base. (In the code the pod is still called "raft", which is what it used to be.)
+let fabOnly = false;          // true when you are using a room's fabricator from outside, in the sea
+function goToRaft(room, outside) {
   mode = "raft";
   homeAt = room || null;
-  if (!homeAt) Object.assign(player, { x: 7, y: -0.5, z: 0 });
-  Object.assign(player, { vx: 0, vy: 0, vz: 0, air: maxAir(), hp: Math.max(player.hp, 60), inSub: false });
+  fabOnly = Boolean(room && outside);
+  if (!homeAt) inBase = false;
+  if (!homeAt) Object.assign(player, { x: 9.5, y: -0.5, z: 0 });
+  Object.assign(player, { vx: 0, vy: 0, vz: 0, inSub: false });
+  if (!fabOnly) Object.assign(player, { air: maxAir(), hp: Math.max(player.hp, 60) });
   torchOn = false;
   scanning = false;
   placing = null;
   ghost.visible = false;
   if (document.pointerLockElement) document.exitPointerLock();
-  el("home-title").textContent = homeAt ? "Your " + partOf(homeAt.kind).name.toLowerCase() : "Your raft";
-  el("dive").textContent = homeAt ? "Back into the sea" : "Dive in!";
+  el("home-title").textContent = fabOnly ? "Fabricator" : homeAt ? "Your room" : "Your pod";
+  el("dive").textContent = fabOnly ? "Back into the sea" : homeAt ? "Back to the room" : "Dive in!";
   el("raft").hidden = false;
+  el("fab").hidden = false;
   el("prompt").hidden = true;
   drawRaftMenu();
   save();
@@ -1269,64 +1847,142 @@ function drawRaftMenu() {
     });
     acts.appendChild(button);
   };
-  if (state.bag.cooked > 0 || state.bag.fish > 0) offer("Eat a cooked fish (you have " + state.bag.cooked + ")", state.bag.cooked > 0, eatFish);
-  if (homeAt && homeAt.kind === "kitchen") offer("Cook " + state.bag.fish + " raw fish in the oven", state.bag.fish > 0, function () {
-    toast("Sizzle! " + state.bag.fish + " fish, cooked golden brown. Press G to eat one (or use the button here).", 5);
-    state.bag.cooked += state.bag.fish;
-    state.bag.fish = 0;
-    sfx.make();
-  });
-  if (homeAt && homeAt.kind === "aquarium") offer("Put a fish in the tank (" + (homeAt.fish || 0) + " of 6 in it)", state.bag.fish > 0 && (homeAt.fish || 0) < 6, function () {
-    homeAt.fish = (homeAt.fish || 0) + 1;
-    state.bag.fish--;
-    rebuildBase();
-    sfx.pick();
-    toast("Plop! Your fish swims happily round its new home.", 4);
-  });
-  if (homeAt && homeAt.kind === "greenhouse") offer("Pick " + Math.floor(homeAt.ripe || 0) + " kelp", (homeAt.ripe || 0) >= 1, function () {
-    state.bag.kelp += Math.floor(homeAt.ripe);
-    homeAt.ripe -= Math.floor(homeAt.ripe);
-    sfx.pick();
-  });
+  offer("Eat a cooked fish (" + state.bag.cooked + " in your bag) · food " + Math.round(state.food) + "%", state.bag.cooked > 0, eatFish);
+  offer("Drink a bottle of water (" + state.bag.water + " in your bag) · water " + Math.round(state.water) + "%", state.bag.water > 0, drinkWater);
+  // (Your pod has everything. A room has its fabricator, and whatever else you built in it. From outside you can only reach the fabricator.)
+  const has = (kind) => !homeAt || kind === "fab" || (!fabOnly && homeAt.items.some((item) => item.kind === kind));
+  el("rest").hidden = !has("bed");
+  el("rest").textContent = state.time / DAY >= 0.55 ? "Sleep until morning" : "Rest a while";
+  // The pod locker: everything you own is listed, with how many are in your bag and how many are in the locker
+  el("locker-title").textContent = homeAt ? "Locker" : "Pod locker";
+  el("locker-note").textContent = homeAt ? "Every locker in your base is joined to your pod locker by a delivery tube, so they all hold the same things." : "Keep your things here. If you black out, the sea takes half of what is in your bag, but it can never take what is in the locker.";
+  el("bag-list").hidden = has("locker");
+  el("locker-box").hidden = !has("locker");
+  const shelves = el("locker");
+  shelves.innerHTML = "";
+  for (const kind in LOOT) {
+    if (state.bag[kind] + state.locker[kind] === 0) continue;
+    const row = document.createElement("div");
+    row.className = "shelf";
+    row.innerHTML = "<span>" + LOOT[kind].name + "<br>bag " + state.bag[kind] + " · locker " + state.locker[kind] + "</span>";
+    for (const [word, from, to] of [["Store", "bag", "locker"], ["Take", "locker", "bag"]]) {
+      const button = document.createElement("button");
+      button.textContent = word;
+      button.disabled = state[from][kind] === 0;
+      button.addEventListener("click", function () {
+        state[to][kind] += state[from][kind];
+        state[from][kind] = 0;
+        sfx.pick();
+        drawRaftMenu();
+        save();
+      });
+      row.appendChild(button);
+    }
+    shelves.appendChild(row);
+  }
+  if (!shelves.children.length) shelves.textContent = "Your locker and your bag are both empty. Dive in and find some shells!";
+  // The fabricator makes new gear. In the pod it can use what is in your bag AND what is in the locker.
+  const dead = Boolean(homeAt) && state.power < 5;          // (a fabricator in your base needs 5 power for each thing it makes)
+  el("fab-body").hidden = !has("fab");
+  el("fab-note").textContent = dead ? "NO POWER! This fabricator can't work until your base has power again. (The one in your pod always works.)" : homeAt ? "It uses what is in your bag and in your locker, and 5 power for each thing it makes." : "It uses what is in your bag and in your locker.";
+  const stock = (kind) => state.bag[kind] + state.locker[kind];
+  const spend = function (needs) {            // (things come out of your bag first, then out of the locker)
+    for (const kind in needs) {
+      const fromBag = Math.min(state.bag[kind], needs[kind]);
+      state.bag[kind] -= fromBag;
+      state.locker[kind] -= needs[kind] - fromBag;
+    }
+  };
+  const wants = (needs) => Object.keys(needs).map((kind) => '<span class="' + (stock(kind) >= needs[kind] ? "ok" : "short") + '">' + needs[kind] + " " + LOOT[kind].name.toLowerCase() + "</span>").join(", ");
+  // Supplies: things you use up, so you can make them again and again
+  const supplies = el("supplies");
+  supplies.innerHTML = "";
+  for (const supply of SUPPLIES) {
+    if (supply.oven && !has("oven")) continue;         // (fish can only be cooked at the pod, or in a room with an oven)
+    const button = document.createElement("button");
+    button.className = "recipe";
+    button.disabled = dead || !Object.keys(supply.needs).every((kind) => stock(kind) >= supply.needs[kind]);
+    button.innerHTML = "<b>" + supply.name + "</b> (you have " + stock(supply.id) + ")<br>" + supply.does + "<br>Needs: " + wants(supply.needs);
+    button.addEventListener("click", function () {
+      spend(supply.needs);
+      if (homeAt) state.power -= 5;
+      state.bag[supply.id]++;
+      sfx.make();
+      toast("You made: " + supply.name + ". It is in your bag. " + supply.does, 4);
+      drawRaftMenu();
+      save();
+    });
+    supplies.appendChild(button);
+  }
+  // Base pieces: the fabricator makes them, then you take them out into the sea and put them down with the Builder (B)
+  const kits = el("kits");
+  kits.innerHTML = "";
+  for (const part of BASE_PARTS.filter((each) => each.kit)) {
+    const button = document.createElement("button");
+    button.className = "recipe";
+    button.disabled = dead || !Object.keys(part.needs).every((kind) => stock(kind) >= part.needs[kind]);
+    button.innerHTML = "<b>" + part.name + "</b> (you have " + (state.kits[part.id] || 0) + ")<br>" + part.does + "<br>Needs: " + wants(part.needs);
+    button.addEventListener("click", function () {
+      spend(part.needs);
+      if (homeAt) state.power -= 5;
+      state.kits[part.id] = (state.kits[part.id] || 0) + 1;
+      sfx.make();
+      toast("You made a " + part.name.toLowerCase() + ". Take it out into the sea, then press B to put it where you want it.", 6);
+      drawRaftMenu();
+      save();
+    });
+    kits.appendChild(button);
+  }
   const list = el("recipes");
   list.innerHTML = "";
   for (const recipe of RECIPES) {
     const button = document.createElement("button");
     const made = Boolean(state.gear[recipe.id]), locked = recipe.after && !state.gear[recipe.after];
-    const enough = Object.keys(recipe.needs).every((kind) => state.bag[kind] >= recipe.needs[kind]);
+    const enough = Object.keys(recipe.needs).every((kind) => stock(kind) >= recipe.needs[kind]);
     button.className = "recipe" + (made ? " made" : "");
-    button.disabled = made || locked || !enough;
-    const needs = Object.keys(recipe.needs).map((kind) => '<span class="' + (state.bag[kind] >= recipe.needs[kind] ? "ok" : "short") + '">' + recipe.needs[kind] + " " + LOOT[kind].name.toLowerCase() + "</span>").join(", ");
+    button.disabled = made || locked || !enough || dead;
+    const needs = wants(recipe.needs);
     button.innerHTML = "<b>" + recipe.name + "</b>" + (made ? " ✓ made" : locked ? " (make the " + RECIPES.find((other) => other.id === recipe.after).name.toLowerCase() + " first)" : "") + "<br>" + recipe.does + (made ? "" : "<br>Needs: " + needs);
     button.addEventListener("click", function () {
-      for (const kind in recipe.needs) state.bag[kind] -= recipe.needs[kind];
+      spend(recipe.needs);
+      if (homeAt) state.power -= 5;
       state.gear[recipe.id] = true;
       sfx.make();
       toast("You made: " + recipe.name + "! " + recipe.does, 5);
-      if (recipe.id === "bubble") toast("You built the Bubble! It is bobbing beside the raft. Swim up to it and press E to climb in.", 7);
+      if (recipe.id === "knife") drawTools();
+      if (recipe.id === "bubble") toast("You built the Bubble! It is bobbing beside your pod. Swim up to it and press E to climb in.", 7);
       drawRaftMenu();
       save();
     });
     list.appendChild(button);
   }
-  el("bag-list").textContent = Object.keys(LOOT).map((kind) => LOOT[kind].name + ": " + state.bag[kind]).join("   ");
+  el("bag-list").textContent = "In your bag: " + (Object.keys(LOOT).filter((kind) => state.bag[kind] > 0).map((kind) => LOOT[kind].name + " " + state.bag[kind]).join(", ") || "nothing");
 }
+el("store-all").addEventListener("click", function () {
+  for (const kind in state.bag) [state.locker[kind], state.bag[kind]] = [state.locker[kind] + state.bag[kind], 0];
+  sfx.pick();
+  drawRaftMenu();
+  save();
+});
 el("rest").addEventListener("click", function () {
   player.hp = 100;
   state.hull = 100;
-  for (const thing of loot) if (thing.taken) {
-    thing.taken = false;
-    showLoot(thing, true);
-  }
   sfx.make();
-  toast((homeAt ? "You sleep snug in your bunk." : "You sleep under the stars.") + " In the morning you feel strong again, the Bubble is mended, and the sea has washed in new things to find.", 6);
+  const where = homeAt ? "You sleep snug in your bunk." : "You sleep in your pod, rocked by the waves.";
+  if (state.time / DAY >= 0.55) {
+    // In the evening or at night, you sleep right through until sunrise
+    newDay();
+    toast(where + " Sunrise! You have survived " + state.days + (state.days === 1 ? " day" : " days") + ". You feel strong again, the Bubble is mended, and the sea has washed in new things to find.", 7);
+  } else toast("You rest for a while. You feel strong again and the Bubble is mended. (Come back in the evening to sleep until morning.)", 6);
+  drawRaftMenu();
   save();
 });
 el("dive").addEventListener("click", function () {
   el("raft").hidden = true;
+  el("fab").hidden = true;
   mode = "swim";
-  if (!homeAt) Object.assign(player, { x: 7.2, y: -0.6, z: 0, yaw: -Math.PI / 2, pitch: -0.3 });
-  player.air = maxAir();
+  if (!homeAt) Object.assign(player, { x: 9.8, y: -0.6, z: 0, yaw: -Math.PI / 2, pitch: -0.3 });
+  if (!fabOnly) player.air = maxAir();
   sfx.splash();
   if (!TEST) canvas.requestPointerLock();
 });
@@ -1347,10 +2003,66 @@ el("build-close").addEventListener("click", toggleBuild);
 // What is close enough to use? (The nearest thing wins.)
 function nearby() {
   const near = (place, reach) => Math.hypot(place.x - player.x, (place.y === undefined ? player.y : place.y) - player.y, place.z - player.z) < reach;
-  if (!player.inSub && player.y > -4 && Math.hypot(player.x - 5.5, player.z) < 3.8) return { text: "E: climb onto your raft", act: goToRaft };
+  if (!player.inSub && player.y > -4 && Math.hypot(player.x - 8, player.z) < 3.8) return { text: "E: climb into your pod", act: goToRaft };
   const sub = state.subAt || DOCK;
   const room = roomHere();
-  if (room) return { text: "E: use your " + partOf(room.kind).name.toLowerCase() + (room.kind === "kitchen" ? " (cook, make gear, rest)" : " (make gear, rest, sea journal)") + "     X: pack it up", act: () => goToRaft(room) };
+  if (!player.inSub) for (const part of state.base) {
+    if (!isRoom(part)) continue;
+    const hatch = hatchOf(part), gapTo = (x, y, z) => Math.hypot(x - player.x, y - player.y, z - player.z);
+    if (inBase) {
+      // (indoors, the hatch only counts if you are right by it, and nearer to it than to anything you have built)
+      const door = { x: hatch.x - hatch.nx * 1.3, y: part.y + 1.6, z: hatch.z - hatch.nz * 1.3 }, thing = room === part ? itemNear(room) : null;
+      if (room === part && player.y < part.y + 4 && near(door, 2.1) && !(thing && Math.hypot(room.x + thing.x - player.x, room.z + thing.z - player.z) < Math.hypot(door.x - player.x, door.z - player.z)))
+        return { text: "E: go out through the hatch", act: () => useHatch(part) };
+    } else {
+      // (out in the sea: the fabricator on the wall, or the hatch, whichever you are nearer to)
+      const fab = fabOf(part).out, toFab = gapTo(fab.x + hatch.nx * 0.9, fab.y, fab.z + hatch.nz * 0.9), toHatch = gapTo(hatch.x + hatch.nx * 1.2, hatch.y, hatch.z + hatch.nz * 1.2);
+      if (toFab < 2.4 && toFab < toHatch) return { text: "E: use the fabricator on the wall", act: () => goToRaft(part, true) };
+      if (toHatch < 3.2) return { text: "E: go in through the hatch     X: pack up the whole " + partOf(part.kind).name.toLowerCase(), act: () => useHatch(part) };
+    }
+  }
+  if (room) {
+    const item = itemNear(room), pack = item && item.fixed ? "" : "     X: pack it up";
+    if (!item) return room.items.length || room.kind === "lookout" ? null : { text: "B: build things inside this room (a locker, a bed, an oven and more)", act: toggleBuild };
+    if (item.kind === "fab") return { text: (powered ? "E: use the fabricator" : "The fabricator has no power (E: look anyway)") + pack, act: () => goToRaft(room) };
+    if (item.kind === "locker") return { text: "E: open the locker" + pack, act: () => goToRaft(room) };
+    if (item.kind === "bed") return { text: "E: rest in your bed" + pack, act: () => goToRaft(room) };
+    if (item.kind === "oven") return { text: (state.bag.fish > 0 ? "E: cook " + state.bag.fish + " raw fish in the oven" : "An oven. Bring it raw fish to cook (catch them with the Net)") + pack, act: function () {
+      if (state.bag.fish < 1) return toast("You have no raw fish in your bag. Catch some with the Net.", 3);
+      if (state.power < 3) return toast("The oven has no power.", 3);
+      state.power -= 3;
+      toast("Sizzle! " + state.bag.fish + " fish, cooked golden brown. Press G to eat one.", 5);
+      state.bag.cooked += state.bag.fish;
+      state.bag.fish = 0;
+      sfx.make();
+    } };
+    if (item.kind === "tank") return { text: "E: put a fish in the tank (" + (item.fish || 0) + " of 4 in it)" + pack, act: function () {
+      if (state.bag.fish < 1) return toast("You have no raw fish in your bag. Catch one with the Net.", 3);
+      if (item.fish >= 4) return toast("The tank is full.", 3);
+      item.fish = (item.fish || 0) + 1;
+      state.bag.fish--;
+      rebuildBase();
+      sfx.pick();
+      toast("Plop! Your fish swims happily round its new home.", 4);
+    } };
+    if (item.kind === "planter") return { text: (item.ripe >= 1 ? "E: pick " + Math.floor(item.ripe) + " kelp from the planter" : "The kelp in this planter is still growing") + pack, act: function () {
+      if (item.ripe < 1) return;
+      state.bag.kelp += Math.floor(item.ripe);
+      toast("+" + Math.floor(item.ripe) + " kelp (you have " + state.bag.kelp + ")", 3);
+      item.ripe -= Math.floor(item.ripe);
+      sfx.pick();
+    } };
+    if (item.kind === "reactor") return { text: "E: feed the reactor 1 kelp (+15 power)" + pack, act: function () {
+      if (state.bag.kelp < 1) return toast("You have no kelp in your bag.", 3);
+      if (state.power > powerCap() - 1) return toast("The batteries are full.", 3);
+      state.bag.kelp--;
+      state.power = Math.min(powerCap(), state.power + 15);
+      sfx.make();
+      toast("Glub! The reactor hums. Base power: " + Math.round(state.power) + " of " + powerCap() + ".", 3);
+    } };
+    return { text: "A " + itemOf(item.kind).name.toLowerCase() + pack, act: () => {} };
+  }
+  if (room) return null;
   for (const part of state.base) {
     if (part.kind === "garden" && part.ripe >= 1 && near({ x: part.x, y: part.y + 1, z: part.z }, 4.5)) return { text: "E: pick " + Math.floor(part.ripe) + " kelp from your garden", act: function () {
       state.bag.kelp += Math.floor(part.ripe);
@@ -1401,6 +2113,8 @@ function nearby() {
     sfx.pick();
     toast("+1 " + LOOT[best.kind].name.toLowerCase() + " (you have " + state.bag[best.kind] + ")", 2);
   } };
+  const target = !player.inSub && !inBase && packTarget();
+  if (target) return { text: "X: pack up this " + target.name + " (you get everything back)", act: () => {} };
   if (player.inSub) return { text: "E: climb out of the Bubble", act: function () {
     state.subAt = { x: player.x, y: player.y, z: player.z };
     player.inSub = false;
@@ -1420,30 +2134,40 @@ let standing = false;        // true while you are on your feet inside a room or
 let steps = 0;               // (counts up as you walk, to bob the view a little)
 // How high is the floor under you? A lookout has a second floor at the top of its tower, and a tunnel's floor slopes from one door to the other.
 function floorOf(room, tube) {
-  if (room) return room.kind === "lookout" && player.y > room.y + 8.6 ? room.y + 8 : room.y;
-  const dx = tube.bx - tube.ax, dz = tube.bz - tube.az;
-  const along = clamp(((player.x - tube.ax) * dx + (player.z - tube.az) * dz) / (dx * dx + dz * dz || 1), 0, 1);
-  return tube.ay + (tube.by - tube.ay) * along - 1.3;
+  if (room) return room.kind === "lookout" && player.y > room.y + 14.6 ? room.y + 14 : room.y;
+  const span = spanOf(tube), dx = span.bx - span.ax, dz = span.bz - span.az;
+  const along = clamp(((player.x - span.ax) * dx + (player.z - span.az) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+  return span.ay + (span.by - span.ay) * along - 1.7;
 }
-function walkIndoors(dt, room, tube, ahead, across) {
+function walkIndoors(dt, ahead, across) {
   // W and S walk the way you are facing (level with the floor), A and D step sideways, Shift runs
   const wx = -Math.sin(player.yaw) * ahead + Math.cos(player.yaw) * across, wz = -Math.cos(player.yaw) * ahead - Math.sin(player.yaw) * across;
   const length = Math.hypot(wx, wz) || 1, speed = ahead || across ? (keys.ShiftLeft || keys.ShiftRight ? 7 : 4.5) : 0;
   player.vx += ((wx / length) * speed - player.vx) * Math.min(1, dt * 10);
   player.vz += ((wz / length) * speed - player.vz) * Math.min(1, dt * 10);
-  player.x += player.vx * dt;
-  player.z += player.vz * dt;
-  steps += dt * speed * 1.6;
+  // The walls are solid: a step only counts if it ends up inside a room or a tunnel. (If you walk into a wall at a slant, you slide along it.)
+  const inside = (x, y, z) => Boolean(roomAt(x, y, z) || tunnelAt(x, y, z));
+  const nx = player.x + player.vx * dt, nz = player.z + player.vz * dt;
+  if (inside(nx, player.y, nz)) [player.x, player.z] = [nx, nz];
+  else if (inside(nx, player.y, player.z)) [player.x, player.vz] = [nx, 0];
+  else if (inside(player.x, player.y, nz)) [player.z, player.vx] = [nz, 0];
+  else player.vx = player.vz = 0;
+  steps += dt * Math.hypot(player.vx, player.vz) * 1.6;
   // Your eyes are 1.6 metres above the floor. Gravity pulls you down on to it, and it stops you there.
+  const room = roomAt(player.x, player.y, player.z), tube = room ? null : tunnelAt(player.x, player.y, player.z);
+  if (!room && !tube) return;
   const eye = floorOf(room, tube) + 1.6, tower = room && room.kind === "lookout";
   const climbing = tower && (keys.Space || keys.KeyC || keys.ControlLeft);
-  if (climbing) player.vy = keys.Space ? 4 : -4;                 // (in a lookout, Space and C climb the rungs up and down)
+  if (climbing) player.vy = keys.Space ? 5 : -5;                 // (in a lookout, Space and C climb the rungs up and down)
+  else if (tower && player.y > eye + 0.05 && player.y < room.y + 14.6) player.vy = 0;        // (part way up, you hold on to the ladder)
   else if (player.y <= eye + 0.02) player.vy = keys.Space ? 5.5 : 0;        // on the floor: Space is a little jump
   else player.vy -= 20 * dt;
-  player.y += player.vy * dt;
-  const roof = room ? room.y + (tower ? 10.4 : 3) : eye + 0.9;          // (you can't go up through the ceiling)
-  if (player.y > roof) [player.y, player.vy] = [roof, Math.min(0, player.vy)];
-  if (player.y < eye && !(tower && (keys.KeyC || keys.ControlLeft))) player.y = Math.min(eye, player.y + Math.max(dt * 8, (eye - player.y) * Math.min(1, dt * 12)));
+  let ny = player.y + player.vy * dt;
+  const roof = room ? room.y + (tower ? 18.6 : HIGH - 0.4) : eye + 0.9;          // (you can't go up through the ceiling)
+  if (ny > roof) [ny, player.vy] = [roof, Math.min(0, player.vy)];
+  if (ny < eye && !(tower && (keys.KeyC || keys.ControlLeft))) ny = Math.min(eye, ny + Math.max(dt * 8, (eye - ny) * Math.min(1, dt * 12)));
+  if (inside(player.x, ny, player.z)) player.y = ny;
+  else player.vy = 0;
 }
 
 // ----- Swimming -----
@@ -1453,9 +2177,9 @@ function swim(dt) {
   player.yaw -= ((keys.ArrowRight ? 1 : 0) - (keys.ArrowLeft ? 1 : 0)) * 1.8 * dt;          // (the left and right arrows turn you, if you would rather not use the mouse)
   const boost = state.gear.zipfin && (keys.ShiftLeft || keys.ShiftRight) && !player.inSub;
   // Inside a room or a tunnel there is air, so you stand on the floor and walk about instead of swimming
-  const room = roomHere(), tube = room ? null : tunnelHere();
-  standing = Boolean(room || tube);
-  if (standing) walkIndoors(dt, room, tube, ahead, across);
+  if (inBase && !roomHere() && !tunnelHere()) inBase = false;          // (the room you were in has been packed up)
+  standing = inBase;
+  if (standing) walkIndoors(dt, ahead, across);
   else {
     const way = lookWay(), side = [Math.cos(player.yaw), 0, -Math.sin(player.yaw)];
     const wx = way[0] * ahead + side[0] * across, wy = way[1] * ahead + rise, wz = way[2] * ahead + side[2] * across;
@@ -1468,6 +2192,7 @@ function swim(dt) {
     player.x += player.vx * dt;
     player.y += player.vy * dt;
     player.z += player.vz * dt;
+    keepOut();
   }
   // You can't swim through the sea bed, above the waves, or out of this part of the sea
   const floor = -depthAt(player.x, player.z) + (player.inSub ? 2 : 0.9), top = player.inSub ? -1.6 : 0.25;
@@ -1483,27 +2208,35 @@ function swim(dt) {
     }
   }
   const raftGap = Math.hypot(player.x, player.z);
-  if (player.y > -1.6 && raftGap < 6.4 && raftGap > 0.01) {       // (the raft is in the way)
-    player.x *= 6.4 / raftGap;
-    player.z *= 6.4 / raftGap;
+  if (player.y > -4.6 && raftGap < 6.6 && raftGap > 0.01) {       // (the pod is in the way)
+    player.x *= 6.6 / raftGap;
+    player.z *= 6.6 / raftGap;
   }
   // Air: it runs down under water, and fills up again at the top (or inside the Bubble)
   const inside = indoors();                              // (the rooms and tunnels of your base are full of air, and keep the squeeze of the deep out)
   const under = player.y < -0.35 && !player.inSub && !inside;
+  const stale = inside && !powered;                      // (a base with no power can't make fresh air)
   if (under) player.air -= dt * (clock.value < fedUntil ? 0.65 : 1);
-  else player.air = Math.min(maxAir(), player.air + dt * 30);
+  else if (stale) {
+    player.air -= dt * 0.5;
+    if (clock.value > warned) {
+      warned = clock.value + 12;
+      sfx.warn();
+      toast("NO POWER! The lights are out and the air in here is going stale. Make a solar panel at your pod's fabricator and put it outside, or feed a kelp reactor.", 6);
+    }
+  } else player.air = Math.min(maxAir(), player.air + dt * 30);
   if (under && Math.random() < dt * (boost ? 8 : 2.5)) blowBubble();
   if (player.air <= 0) {
     player.air = 0;
     player.hp -= 11 * dt;
     if (clock.value > airBeep) {
       airBeep = clock.value + 1.2;
-      hurt(0.01, "You are out of air! Swim up, quickly!");
+      hurt(0.01, stale ? "You are out of air! Get out and swim up, quickly!" : "You are out of air! Swim up, quickly!");
     }
-  } else if (player.air < 12 && under && clock.value > airBeep) {
+  } else if (player.air < 12 && (under || stale) && clock.value > airBeep) {
     airBeep = clock.value + 2;
     sfx.warn();
-    toast("Your air is running low! Head for the surface.", 2);
+    toast(stale ? "Your air is running low, and this base has no power to make more!" : "Your air is running low! Head for the surface.", 2);
   }
   if (!under && player.hp < 100) player.hp = Math.min(100, player.hp + dt * 2);
   // Going deeper than your gear allows squeezes you
@@ -1531,14 +2264,15 @@ function bubbleAt(x, y, z, size, life) {
 }
 function blowBubble() {
   const way = lookWay();
-  bubbleAt(player.x + way[0] * 0.5, player.y - 0.2, player.z + way[2] * 0.5, 1, 2.5);
+  bubbleAt(player.x + way[0] * 1.1, player.y + way[1] * 1.1 - 0.35, player.z + way[2] * 1.1, 0.6, 2.5);       // (a little way in front of your mask, so they don't fill your view)
   if (Math.random() < 0.25) sfx.bubble();
 }
 
 // ----- How the creatures behave -----
 function updateCreatures(dt) {
   const way = lookWay(), sheltered = indoors(), swimming = mode === "swim" && !card && !sheltered;
-  const lamps = state.base.filter((part) => part.kind === "lamp");
+  const bolder = 1 + (1 - sunUp()) * 0.35;         // at night, the hunters notice you from further away
+  const lamps = state.base.filter((part) => part.kind === "lamp"), rooms = state.base.filter(isRoom);
   for (const c of creatures) {
     const spec = c.spec, model = c.model;
     const dx = player.x - c.x, dy = player.y - c.y, dz = player.z - c.z, far = Math.hypot(dx, dy, dz);
@@ -1554,9 +2288,10 @@ function updateCreatures(dt) {
     if (!seen && !spec.giant && !spec.levi) continue;          // (too far away to matter)
     c.timer -= dt;
     c.cool -= dt;
+    c.hunting = false;
     let speed = spec.speed, turning = spec.giant ? 0.35 : spec.levi ? 0.9 : 2.4;
     // A leviathan that hunts makes the sea feel uneasy long before you see it
-    if (spec.levi && spec.hunter && swimming && far < spec.hunter.range + 35 && clock.value > leviWarn) {
+    if (spec.levi && spec.hunter && swimming && far < spec.hunter.range * bolder + 35 && clock.value > leviWarn) {
       leviWarn = clock.value + 28;
       shake = 0.3;
       sfx.rumble();
@@ -1570,7 +2305,12 @@ function updateCreatures(dt) {
       c.goal = { x: c.x - dx * 3, y: c.y - dy, z: c.z - dz * 3 };             // your sea whistle sends it away
       speed = spec.hunter.speed;
       c.timer = 1;
-    } else if (spec.hunter && swimming && far < spec.hunter.range) {
+    } else if (c.scare > clock.value) {
+      c.goal = { x: c.x - dx * 3, y: c.y - dy * 2, z: c.z - dz * 3 };         // (it has just been jabbed with your knife)
+      speed = (spec.hunter ? spec.hunter.speed : spec.speed * 2.3) * 1.1;
+      c.timer = 1;
+    } else if (spec.hunter && swimming && far < spec.hunter.range * bolder) {
+      c.hunting = true;
       const lit = spec.hunter.fearsTorch && ((torchOn && far < (state.gear.lens ? 30 : 18) && (-dx * way[0] - dy * way[1] - dz * way[2]) / far > 0.84) || lamps.some((lamp) => Math.hypot(lamp.x - c.x, lamp.y - c.y, lamp.z - c.z) < 16));
       if (lit) {
         c.goal = { x: c.x - dx * 3, y: c.y - dy * 3, z: c.z - dz * 3 };       // dazzled by your torch: it flees
@@ -1603,9 +2343,11 @@ function updateCreatures(dt) {
       c.goal = { x: gx, z: gz, y: -deep + 1.2 + Math.random() * deep * (spec.rise || 0) * 0.8 };
       c.timer = 4 + Math.random() * 6;
     }
-    if (spec.jelly && swimming && !player.inSub && far < spec.size * 1.7 && c.cool <= 0) {      // ("swimming" is false inside your base: nothing can sting you there)
+    // Jellyfish sting if you touch them. A giant one's arms hang a long way down, so never swim underneath it.
+    const touching = spec.tall ? Math.hypot(dx, dz) < spec.size * 0.95 && dy < spec.size && dy > -spec.size * spec.tall : far < spec.size * 1.7;
+    if (spec.jelly && swimming && !player.inSub && touching && c.cool <= 0) {      // ("swimming" is false inside your base: nothing can sting you there)
       c.cool = 2;
-      hurt(12, "A Stingcap stung you! Swim round them, not through them.");
+      hurt(spec.sting || 12, "A " + spec.name + " stung you! Swim round them, not through them.");
     }
     if (spec.puffs) c.puff += ((far < 6 ? 1.8 : 1) - c.puff) * Math.min(1, dt * 5);
     // Turn towards the goal, then swim forwards
@@ -1619,13 +2361,18 @@ function updateCreatures(dt) {
     c.x += Math.sin(c.yaw) * Math.cos(c.pitch) * speed * dt;
     c.z += Math.cos(c.yaw) * Math.cos(c.pitch) * speed * dt;
     c.y += Math.sin(c.pitch) * speed * dt;
-    const floor = -depthAt(c.x, c.z) + (spec.crawl ? 0.05 : spec.size * 0.7 + 0.4);
+    for (const part of rooms) {              // (nothing swims into your rooms: they are nudged round the outside)
+      const gx = c.x - part.x, gz = c.z - part.z, gap = Math.hypot(gx, gz) || 1, need = (part.kind === "lookout" ? 6.5 : ROOM * 1.42 + 0.5) + spec.size * 0.6;
+      if (gap < need && c.y > part.y - 3 && c.y < part.y + (part.kind === "lookout" ? 22 : HIGH + 2)) [c.x, c.z, c.timer] = [part.x + (gx / gap) * need, part.z + (gz / gap) * need, 0];
+    }
+    const floor = -depthAt(c.x, c.z) + (spec.crawl ? 0.05 : spec.size * (spec.tall || 0.7) + 0.4);
     c.y = spec.crawl ? floor : clamp(c.y, floor, -spec.size * 0.8 - 0.6);
     // Show it: tails wag, wings flap, jellyfish pulse
     model.group.position.set(c.x, c.y, c.z);
     model.group.rotation.set(spec.jelly || spec.crawl ? 0 : -c.pitch, c.yaw, 0);
     const beat = clock.value * (2 + speed * 1.6) + c.phase;
     if (model.tail) model.tail.rotation[model.flatTail ? "x" : "y"] = Math.sin(beat) * (model.flatTail ? 0.3 : 0.5);
+    if (model.jaw) model.jaw.rotation.x = 0.1 + (c.hunting ? 0.6 : 0.16) * (0.5 + 0.5 * Math.sin(clock.value * (c.hunting ? 5 : 1.1) + c.phase));       // the Gapejaw's mouth yawns open, and snaps when it hunts
     if (model.wings) model.wings.forEach((wing, n) => (wing.rotation.z = Math.sin(beat * 0.5) * 0.45 * (n ? -1 : 1)));
     const pulse = spec.jelly ? 1 + Math.sin(clock.value * 1.6 + c.phase) * 0.12 : 1;
     model.group.scale.set(spec.size * c.puff * pulse, spec.size * c.puff * (2 - pulse), spec.size * c.puff * pulse);
@@ -1708,29 +2455,41 @@ function updateHud() {
   const air = Math.ceil(player.air), deep = Math.max(0, -player.y);
   el("air-fill").style.width = (player.air / maxAir()) * 100 + "%";
   el("air-fill").style.background = player.air < 12 ? "#ff5a5a" : "#7ad8ff";
-  el("air-text").textContent = player.inSub ? "Air: endless · Bubble hull " + Math.round(state.hull) + "%" : indoors() ? "Air: endless (in your base)" : "Air: " + air + " s" + (clock.value < fedUntil ? " · well fed" : "");
+  el("air-text").textContent = player.inSub ? "Air: endless · Bubble hull " + Math.round(state.hull) + "%" : indoors() && powered ? "Air: endless (in your base)" : "Air: " + air + " s" + (indoors() ? " · NO POWER" : "") + (clock.value < fedUntil ? " · well fed" : "");
   el("hp-fill").style.width = clamp(player.hp, 0, 100) + "%";
+  el("food-fill").style.width = state.food + "%";
+  el("water-fill").style.width = state.water + "%";
   el("depth").textContent = Math.round(deep) + " m deep · " + ZONES[zoneAt(player.x, player.z)].name + " · you can go to " + depthLimit() + " m";
   el("bag").textContent = Object.keys(LOOT).filter((kind) => state.bag[kind] > 0).map((kind) => LOOT[kind].name + " " + state.bag[kind]).join(" · ") || "Nothing in your bag yet";
   el("goal").textContent = goalText();
+  const cap = powerCap();
+  el("power").textContent = cap ? "⚡ Base power: " + Math.round(state.power) + " of " + cap + (powerMade() >= powerUsed() ? " ▲" : " ▼") : "";
+  el("power").style.color = powered ? "#7affe0" : "#ff9a8a";
+  el("days").textContent = "Days survived: " + state.days + (state.best > state.days ? " (best " + state.best + ")" : "") + " · " + timeName();
   const next = state.won ? null : state.tablets.includes(false) ? TABLETS[state.tablets.indexOf(false)] : HEART;
-  el("compass").textContent = pointer({ x: 5.5, z: 0, y: 0 }, "Raft") + (next ? "     " + pointer(next, state.tablets.includes(false) ? "Tablet" : "Great Shell") : "") + (state.gear.bubble && !player.inSub ? "     " + pointer(state.subAt || DOCK, "Bubble") : "") + (nearestRoom() ? "     " + pointer(nearestRoom(), "Base") : "") + (lookoutSees() ? "     " + pointer(lookoutSees(), lookoutSees().spec.name) : "");
+  el("compass").textContent = pointer({ x: 8, z: 0, y: 0 }, "Pod") + (next ? "     " + pointer(next, state.tablets.includes(false) ? "Tablet" : "Great Shell") : "") + (state.gear.bubble && !player.inSub ? "     " + pointer(state.subAt || DOCK, "Bubble") : "") + (nearestRoom() ? "     " + pointer(nearestRoom(), "Base") : "") + (lookoutSees() ? "     " + pointer(lookoutSees(), lookoutSees().spec.name) : "");
   const thing = mode === "swim" && !card ? nearby() : null;
   const spotNow = placing && mode === "swim" ? buildSpot() : null;
   el("prompt").textContent = spotNow ? spotNow.why || "E: build the " + placing.name.toLowerCase() + " here     Esc: cancel" : thing ? thing.text : "";
   el("prompt").hidden = !thing && !spotNow;
   el("cockpit").hidden = !player.inSub || mode !== "swim";
-  for (const id of ["meters", "depth", "compass", "bag", "crosshair", "tools"]) el(id).style.visibility = mode === "swim" ? "visible" : "hidden";
+  for (const id of ["meters", "depth", "compass", "bag", "crosshair", "tools", "days", "power"]) el(id).style.visibility = mode === "swim" ? "visible" : "hidden";
   el("tint").style.background = player.air < 10 && !player.inSub && mode === "swim" ? "radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, " + (0.85 - player.air * 0.06) + "))"
     : mode === "swim" && player.y < -0.3 ? "radial-gradient(ellipse at center, transparent 55%, rgba(0, 12, 24, 0.5))" : "";        // (the edges of your mask are a little dark)
 }
 
 // ----- Everything that happens, many times a second -----
-const DEEP_BLUE = [new THREE.Color(0x35b4cc), new THREE.Color(0x0e3a5c), new THREE.Color(0x02050c)], SKY = new THREE.Color(0x9fd8ff);
+const DEEP_BLUE = [new THREE.Color(0x27bcd2), new THREE.Color(0x0b3f72), new THREE.Color(0x030716)], SKY = new THREE.Color(0x9fd8ff);
+const NIGHT_SKY = new THREE.Color(0x060c22), SUNSET = new THREE.Color(0xff9a5a), sunWay = new THREE.Vector3();
 function update(dt) {
   clock.value += dt;
   if (toastTimer > 0 && (toastTimer -= dt) <= 0) el("toast").hidden = true;
-  if (mode === "swim" && !card && el("journal").hidden && el("build").hidden) swim(dt);
+  if (mode === "swim" && !card && el("journal").hidden && el("build").hidden) {
+    swim(dt);
+    if (mode === "swim") passTime(dt);
+    if (mode === "swim") getHungry(dt);
+    if (mode === "swim") runPower(dt);
+  }
   updateCreatures(dt);
   updateScan(dt);
   // The camera: your eyes when you swim, or a slow look round from the raft
@@ -1738,8 +2497,9 @@ function update(dt) {
     camera.position.set(player.x, player.y + (standing ? Math.sin(steps) * 0.045 : 0), player.z);
     camera.rotation.set(player.pitch, player.yaw, 0);
   } else {
-    const about = homeAt ? { x: homeAt.x, y: homeAt.y + 2, z: homeAt.z } : { x: 0, y: 1.5, z: 0 };       // (a slow look round your raft, or your base)
-    camera.position.set(about.x + Math.cos(clock.value * 0.1) * 16, about.y + 4, about.z + Math.sin(clock.value * 0.1) * 16);
+    const about = homeAt ? { x: homeAt.x, y: homeAt.y + 3, z: homeAt.z } : { x: 0, y: 1.5, z: 0 };       // (a slow look round your pod, or your base)
+    const back = homeAt ? 26 : 18;
+    camera.position.set(about.x + Math.cos(clock.value * 0.1) * back, about.y + (homeAt ? 7 : 4.5), about.z + Math.sin(clock.value * 0.1) * back);
     camera.lookAt(about.x, about.y, about.z);
   }
   if (shake > 0) {
@@ -1751,14 +2511,38 @@ function update(dt) {
   const eye = camera.position.y, deep = Math.max(0, -eye), part = clamp(deep / 150, 0, 1);
   const water = part < 0.5 ? DEEP_BLUE[0].clone().lerp(DEEP_BLUE[1], part * 2) : DEEP_BLUE[1].clone().lerp(DEEP_BLUE[2], part * 2 - 1);
   if (state.won) water.lerp(new THREE.Color(0x2a6a8a), 0.35 * part);           // (the Sea Heart lights up the deep)
-  const colour = eye > 0 ? SKY : water;
+  // Day and night: "day" is 1 in full daylight and 0 at night. At sunrise and sunset the sky turns orange.
+  const day = sunUp(), glowing = day * (1 - day) * 4;
+  water.multiplyScalar(mix(0.2, 1, day)).lerp(SUNSET, glowing * 0.12 * (1 - part));
+  const sky = SKY.clone().lerp(NIGHT_SKY, 1 - day).lerp(SUNSET, glowing * 0.5);
+  const colour = eye > 0 ? sky : water;
+  nightGlow.value = (1 - day) * 0.5;
   scene.fog.color.copy(colour);
   const here = mode === "swim" ? roomHere() : null;
   scene.fog.density = (eye > 0 ? 0.0022 : mix(0.02, 0.034, part)) * (here && here.kind === "lookout" ? 0.4 : 1);       // (from a lookout you can see much further)
   renderer.setClearColor(colour);
-  const light = eye > 0 ? 0.85 : mix(0.8, state.won ? 0.3 : 0.1, part), sun = eye > 0 ? 0.7 : mix(0.6, 0, Math.min(1, part * 1.6));
+  let light = (eye > 0 ? 0.85 : mix(0.8, state.won ? 0.3 : 0.1, part)) * mix(eye > 0 ? 0.4 : 0.24, 1, day);
+  podGlass.emissive.set(0xffd070).multiplyScalar(1 - day);
+  if ((mode === "swim" ? standing : homeAt) && powered) light = Math.max(light, 0.62);          // (the lamps inside your base are on, while there is power)
+  windowGlow.color.set(powered ? 0xffe9a0 : 0x1c2630);
+  roomLamp.color.set(powered ? 0xfff0a0 : 0x3a4048);
+  for (const [material, colour] of screens) material.color.set(powered ? colour : 0x1a2028);
+  const sun = (eye > 0 ? 0.7 : mix(0.6, 0, Math.min(1, part * 1.6))) * day;
   skyLight.intensity = light;
-  sunLight.intensity = sun;
+  sunLight.intensity = sun + (1 - day) * 0.07;          // (at night, a little moonlight)
+  // The sun climbs up one side of the sky and goes down the other. At night the moon does the same.
+  const across = day > 0 ? clamp(state.time / (DAY * 0.68), 0, 1) : (state.time / DAY - 0.68) / 0.32;
+  sunWay.set(Math.cos(across * Math.PI) * 0.9, Math.sin(across * Math.PI) * 0.85 + 0.12, 0.35).normalize();
+  sunLight.position.copy(sunWay);
+  sunDisc.visible = day > 0;
+  moonDisc.visible = day < 1 && eye > 0;
+  (day > 0 ? sunDisc : moonDisc).position.copy(camera.position).addScaledVector(sunWay, 560);
+  sunDisc.lookAt(camera.position);
+  moonDisc.lookAt(camera.position);
+  sunDisc.material.color.set(0xfff6c8).lerp(SUNSET, glowing * 0.7);
+  stars.visible = eye > 0 && day < 0.9;
+  stars.material.opacity = 1 - day;
+  stars.position.copy(camera.position);
   const lamps = mode === "swim" && (player.inSub || (torchOn && state.gear.torch));
   torch.intensity = lamps ? (player.inSub ? 1.5 : 1.2) : 0;
   torch.angle = player.inSub ? 0.75 : 0.5;
@@ -1777,15 +2561,19 @@ function update(dt) {
   if (lamp) baseLight.position.set(lamp.x, lamp.y + 3.4, lamp.z);
   for (const part of state.base) {
     if (part.kind === "garden") part.ripe = Math.min(5, (part.ripe || 0) + dt / 40);
-    if (part.kind === "greenhouse") part.ripe = Math.min(8, (part.ripe || 0) + dt / 15);
+    for (const item of part.items || []) if (item.kind === "planter") item.ripe = Math.min(5, (item.ripe || 0) + dt / 20);
   }
-  for (const model of baseModels) if (model.userData.swimmers) model.userData.swimmers.rotation.y = clock.value * 0.5;       // the fish in an aquarium swim round and round
+  for (const model of baseModels) {
+    for (const swimmers of model.userData.spin || []) swimmers.rotation.y = clock.value * 0.5;       // the fish in a tank swim round and round
+    if (model.userData.flash) model.userData.flash[1].material.opacity = 0.22 + 0.2 * Math.sin(clock.value * 3);       // a beacon's beam pulses
+  }
   updateHands(dt, light);
   ghost.visible = Boolean(placing) && mode === "swim";
   if (ghost.visible) {
-    const at = buildSpot(), wide = placing.room || placing.id === "poles" ? 3.6 : 1.3;
-    ghost.position.set(at.x, at.y + 1.5, at.z);
-    ghost.scale.set(wide, 3, wide);
+    const at = buildSpot(), big = placing.room || placing.id === "poles", wide = big ? ROOM : placing.item ? 0.8 : 1.3, tall = big ? HIGH : placing.item ? 1.6 : 3;
+    ghost.geometry = big || placing.item ? GHOST_SQUARE : GHOST_ROUND;
+    ghost.position.set(at.x, at.y + tall / 2, at.z);
+    ghost.scale.set(wide, tall, wide);
     ghost.material.color.set(at.why ? 0xff5a5a : 0x7affa0);
   }
   // Bubbles stream up from the hot vents
@@ -1794,21 +2582,23 @@ function update(dt) {
   u.torchWay.value.set(way[0], way[1], way[2]);
   surface.position.set(camera.position.x, 0, camera.position.z);
   surfacePaint.uniforms.eye.value.copy(camera.position);
-  surfacePaint.uniforms.dull.value.set(eye > 0 ? 0x2a8ac0 : 0x7ad8f0);
-  surfacePaint.uniforms.bright.value.set(eye > 0 ? 0x58b8e0 : 0xf0ffff);
+  surfacePaint.uniforms.below.value = eye > 0 ? 0 : 1;
+  surfacePaint.uniforms.dull.value.set(eye > 0 ? 0x2a8ac0 : 0x5ac8e8).multiplyScalar(mix(0.16, 1, day));
+  surfacePaint.uniforms.bright.value.set(eye > 0 ? 0x58b8e0 : 0xf0ffff).multiplyScalar(mix(0.22, 1, day)).lerp(SUNSET, glowing * 0.35);
   surfacePaint.uniforms.see.value = eye > 0 ? 0.88 : 0.7 * (1 - Math.min(1, deep / 70));
   surfacePaint.uniforms.reach.value = eye > 0 ? 1400 : 230;
   waterBall.position.copy(camera.position);
   waterBall.material.uniforms.middle.value.copy(colour);
-  waterBall.material.uniforms.top.value.copy(eye > 0 ? new THREE.Color(0x4a9ae8) : colour.clone().lerp(new THREE.Color(0xd0f8ff), 0.6 * (1 - part)));
-  waterBall.material.uniforms.bottom.value.copy(eye > 0 ? new THREE.Color(0x2f8ac0) : colour.clone().multiplyScalar(0.4));
-  motes.visible = eye < 0 && deep > 45;
-  motes.material.opacity = Math.min(0.9, (deep - 45) / 60);
+  waterBall.material.uniforms.top.value.copy(eye > 0 ? new THREE.Color(0x4a9ae8).lerp(new THREE.Color(0x02040e), 1 - day) : colour.clone().lerp(new THREE.Color(0xd0f8ff), 0.6 * (1 - part) * day));
+  waterBall.material.uniforms.bottom.value.copy(eye > 0 ? new THREE.Color(0x2f8ac0).multiplyScalar(mix(0.2, 1, day)) : colour.clone().multiplyScalar(0.4));
+  // Little drifting lights: in the deep, and everywhere at night
+  motes.visible = eye < 0 && (deep > 45 || day < 0.5);
+  motes.material.opacity = Math.max(Math.min(0.9, (deep - 45) / 60), (1 - day) * 0.75);
   motes.position.set(Math.round(camera.position.x / 40) * 40, Math.round(camera.position.y / 30) * 30, Math.round(camera.position.z / 40) * 40);
   beams.forEach(function (beam, n) {
-    beam.visible = eye < 0 && deep < 45;
-    beam.position.set(camera.position.x + beam.userData.x + Math.sin(clock.value * 0.3 + n) * 2, -28, camera.position.z + beam.userData.z);
-    beam.material.opacity = 0.075 * (1 - deep / 45) * (0.7 + Math.sin(clock.value + n * 2) * 0.3);
+    beam.visible = eye < 0 && deep < 65 && day > 0.05;
+    beam.position.set(camera.position.x + beam.userData.x + Math.sin(clock.value * 0.3 + n) * 2, -36, camera.position.z + beam.userData.z);
+    beam.material.opacity = 0.06 * day * (1 - deep / 65) * (0.65 + Math.sin(clock.value * 0.8 + n * 2) * 0.35);
   });
   specks.visible = eye < 0;
   specks.position.set(Math.round(camera.position.x / 30) * 30, Math.round(camera.position.y / 20) * 20, Math.round(camera.position.z / 30) * 30);
@@ -1841,17 +2631,75 @@ function update(dt) {
     save();
   }
 }
-let lastTime = performance.now();
+// ----- A last touch on the whole picture -----
+// The game is first drawn into a hidden picture. Then a tiny graphics program copies that picture to the screen, and on the way it adds
+// a soft haze of light round bright things (as real water does), richer colours, and a gentle wobble while you are under water.
+// (Add ?plain to the page's address to turn this off.)
+const finish = (function () {
+  if (!renderer.capabilities.isWebGL2 || location.search.includes("plain")) return null;
+  const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const picture = new THREE.WebGLMultisampleRenderTarget(size.x, size.y, { minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: true });
+  const paintOver = new THREE.ShaderMaterial({
+    uniforms: { map: { value: picture.texture }, time: clock, under: { value: 0 } },
+    vertexShader: `
+      varying vec2 vAt;
+      void main() {
+        vAt = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D map;
+      uniform float time;
+      uniform float under;
+      varying vec2 vAt;
+      void main() {
+        // Under water the picture wobbles very slightly, as if you were looking through moving water
+        vec2 at = vAt + under * 0.0014 * vec2(sin(vAt.y * 34.0 + time * 1.7), cos(vAt.x * 30.0 + time * 1.3));
+        vec3 colour = texture2D(map, at).rgb;
+        // Blurry copies of the picture show where the bright things are. Their light spills a little way into the darker water round them.
+        vec3 soft = texture2D(map, at, 2.5).rgb * 0.45 + texture2D(map, at, 4.5).rgb * 0.35 + texture2D(map, at, 6.0).rgb * 0.2;
+        colour += max(soft - colour, 0.0) * mix(0.3, 0.6, under);
+        // Richer colours, and a little more difference between light and dark
+        float grey = dot(colour, vec3(0.3, 0.59, 0.11));
+        colour = mix(vec3(grey), colour, 1.2);
+        colour = mix(colour, colour * colour * (3.0 - 2.0 * colour), 0.3);
+        // The edges of your mask are a little darker
+        colour *= 1.0 - under * 0.3 * smoothstep(0.38, 0.8, distance(vAt, vec2(0.5)));
+        gl_FragColor = vec4(colour, 1.0);
+      }`,
+    depthTest: false, depthWrite: false,
+  });
+  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), paintOver);
+  sheet.frustumCulled = false;
+  const stage = new THREE.Scene();
+  stage.add(sheet);
+  return { picture: picture, paint: paintOver, stage: stage, camera: new THREE.Camera(), size: size };
+})();
+let lastTime = performance.now(), fpsNow = 0;
 function frame(now) {
+  fpsNow += (1000 / Math.max(1, now - lastTime) - fpsNow) * 0.1;
   const dt = clamp((now - lastTime) / 1000, 0, 0.05);
   lastTime = now;
   update(dt);
+  if (finish) {
+    const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+    if (size.x !== finish.size.x || size.y !== finish.size.y) {           // (the window changed size)
+      finish.picture.setSize(size.x, size.y);
+      finish.size.copy(size);
+    }
+    finish.paint.uniforms.under.value = camera.position.y < 0 ? 1 : 0;
+    renderer.setRenderTarget(finish.picture);
+  }
   renderer.render(scene, camera);
   // Then your arms are drawn on top (so they never poke into anything)
   renderer.autoClear = false;
   renderer.clearDepth();
   renderer.render(handScene, handCamera);
   renderer.autoClear = true;
+  if (finish) {
+    renderer.setRenderTarget(null);
+    renderer.render(finish.stage, finish.camera);
+  }
   requestAnimationFrame(frame);
 }
 
@@ -1859,17 +2707,41 @@ function frame(now) {
 function begin(saved) {
   state = saved ? Object.assign(freshState(), saved) : freshState();
   state.bag = Object.assign(emptyBag(), state.bag);
+  state.locker = Object.assign(emptyBag(), state.locker);
+  state.kits = state.kits || {};
   state.tunnels = state.tunnels || [];
+  // (A game saved before rooms were empty: kitchens, aquariums and greenhouses turn into plain rooms, and every old room keeps what it used to have inside it)
+  const olds = state.base.map((part) => part.kind);
+  for (const part of state.base) part.kind = part.kind === "kitchen" ? "dome" : part.kind === "aquarium" || part.kind === "greenhouse" ? "glassdome" : part.kind;
+  state.base = state.base.filter((part) => partOf(part.kind));
+  for (const part of state.base) {
+    const old = olds[state.base.indexOf(part)];
+    if (part.items || !isRoom(part)) continue;
+    part.items = part.kind === "lookout" ? [] : [{ kind: "locker", x: 0, z: -6.1, turn: 0 }, { kind: "bed", x: 5.6, z: -4.6, turn: 0 }];
+    if (old === "kitchen") part.items.push({ kind: "oven", x: -6, z: 1, turn: Math.PI / 2 });
+    if (old === "aquarium") part.items.push({ kind: "tank", x: 3.4, z: 3.2, turn: 0, fish: Math.min(4, part.fish || 0) });
+    if (old === "greenhouse") part.items.push({ kind: "planter", x: -4.6, z: 3.6, turn: 0, ripe: 0 }, { kind: "planter", x: 4.6, z: 3.6, turn: 0, ripe: 0 });
+    state.power = Math.max(state.power, powerCap());            // (and its battery starts full)
+  }
+  for (const part of state.base) if (part.items) part.items = part.items.filter((item) => itemOf(item.kind));       // (the fabricator is part of the wall now)
+  powered = state.power > 0.01 || !powerCap();
+  for (const tunnel of state.tunnels) {          // (fit each tunnel to the doors of the rooms it joins)
+    for (const [x, y, z] of [["ax", "ay", "az"], ["bx", "by", "bz"]]) {
+      const room = state.base.find((part) => isRoom(part) && part.x === tunnel[x] && part.z === tunnel[z]);
+      if (room) tunnel[y] = doorOf(room).y;
+    }
+  }
   drawTools();
   rebuildBase();
   shellOpen = state.won ? 1 : 0;
   player.hp = 100;
   el("intro").hidden = true;
   goToRaft();
-  if (!saved) showCard(["This is your raft, far out on the wide blue sea. Under it lies a whole world that nobody has ever explored.",
+  if (!saved) showCard(["This is your pod: a little round cabin floating far out on the wide blue sea. Under it lies a whole world that nobody has ever explored.",
     "Dive in and look around. Watch your AIR: when it runs low, swim back up to the top to breathe.",
-    "Pick up shells, kelp and anything else useful (E). Then climb back onto the raft to make better gear: flippers, bigger air tanks, a torch, even a little submarine.",
+    "Pick up shells, kelp and anything else useful (E). Then climb back into your pod to make better gear: flippers, bigger air tanks, a torch, even a little submarine.",
     "You carry four tools: your Hands, a Scanner, a Net for catching fish, and a Builder for making a base on the sea bed. Keys 1 to 4 (or the mouse wheel) choose one, and the left mouse button uses it.",
+    "You will get HUNGRY and THIRSTY. There are two cooked fish and two bottles of water in your pod locker to start you off: take them with you. G eats a fish, V drinks water, and the fabricator makes more.",
     "The old sailors tell of four Tide Tablets hidden under these waves, and a Great Shell at the bottom of the deepest dark. Find them, and you will find the sea's greatest secret.",
     "Hold the right mouse button (or Q) to scan the creatures you meet for your sea journal. Most are friendly. Some are not. Good luck, diver!"]);
 }
@@ -1882,7 +2754,8 @@ requestAnimationFrame(frame);
 window.DW = {
   player: player, keys: keys, creatures: creatures, loot: loot, SPECIES: SPECIES,
   state: () => state, mode: () => mode, card: () => card, interact: interact, nearby: nearby, goToRaft: goToRaft, hurt: hurt, save: save,
-  standing: () => standing, useTool: useTool, pickTool: pickTool, tool: () => TOOLS[tool].id, swingNet: swingNet, eatFish: eatFish, indoors: indoors, fed: () => clock.value < fedUntil,
+  standing: () => standing, inBase: () => inBase, useHatch: useHatch, hatchOf: hatchOf, roomAt: roomAt, useTool: useTool, pickTool: pickTool, tool: () => TOOLS[tool].id, swingNet: swingNet, eatFish: eatFish, indoors: indoors, fed: () => clock.value < fedUntil,
+  power: () => state.power, powered: () => powered, runPower: runPower, powerMade: powerMade, powerUsed: powerUsed, itemNear: itemNear, drinkWater: drinkWater, firstAid: firstAid, jab: jab, getHungry: getHungry, sunUp: sunUp, setTime: (part) => (state.time = part * DAY), passTime: passTime, fps: () => fpsNow,
   setTorch: (on) => (torchOn = on), scan: (on) => (scanning = on), toggleBuild: toggleBuild, placePart: placePart, packUp: packUp, roomHere: roomHere,
-  setPlacing: (id) => (placing = partOf(id)), blowWhistle: blowWhistle, hullHit: hullHit, scared: () => clock.value < scaredUntil,
+  setPlacing: (id) => (placing = partOf(id) || itemOf(id)), blowWhistle: blowWhistle, hullHit: hullHit, scared: () => clock.value < scaredUntil,
 };

@@ -1,6 +1,6 @@
 // Deepwild: the sea.
 // The sea bed is worked out with maths from where you are, so it is the same every time you play.
-// Everything is measured in metres. Your raft floats at the middle (0, 0), over a shallow sandbank.
+// Everything is measured in metres. Your pod floats at the middle (0, 0), over a shallow sandbank.
 // The further you swim from it, the deeper the water gets. Far out, the sea is different in every direction:
 // a trench, fields of crystal, hot vents, a whale graveyard and wide dark plains. Right at the edge lies the Abyss.
 
@@ -83,7 +83,7 @@ const TABLETS = [
   Object.assign(spot(104, 352), { name: "a ledge in the Trench", text: "THE FOURTH TABLET: \"Bring the four stones to the bottom of the dark. The heart will know a friend.\"" }),
 ];
 // Where the leviathans (the giants of the sea) make their homes
-const LAIRS = { tidewyrm: spot(182, 560), kraken: spot(62, 822), emberback: spot(250, 545), lumen: spot(5, 540) };
+const LAIRS = { tidewyrm: spot(182, 560), kraken: spot(62, 822), emberback: spot(250, 545), lumen: spot(5, 540), gapejaw: spot(312, 560) };
 
 // ----- Things scattered over the sea bed -----
 // The sea is cut into squares, 7 metres across. Each square may hold one thing, chosen by where it is.
@@ -177,13 +177,34 @@ const LOOT = {
   shell: { name: "Shell" }, kelp: { name: "Kelp" }, glass: { name: "Sea glass" }, copper: { name: "Copper" }, quartz: { name: "Quartz" }, salvage: { name: "Salvage" },
   pearl: { name: "Glow pearl" }, silver: { name: "Silver" }, amethyst: { name: "Amethyst" }, ember: { name: "Emberstone" }, bone: { name: "Whalebone" }, scale: { name: "Titan scale" },
   fish: { name: "Raw fish" }, cooked: { name: "Cooked fish" },          // (fish are caught with the Net, not picked up off the sea bed)
+  water: { name: "Water bottle" }, medkit: { name: "First aid kit" },   // (made at a fabricator)
 };
 
-// ----- Things to make at the raft -----
+// ----- Things to build inside a room (go in, then press B) -----
+const ROOM_ITEMS = [
+  { id: "locker", name: "Locker", does: "Store your things. Every locker holds the same things as your pod locker.", needs: { salvage: 2 }, item: true },
+  { id: "bed", name: "Bed", does: "Rest here, or sleep through the night.", needs: { kelp: 3, shell: 1 }, item: true },
+  { id: "oven", name: "Oven", does: "Cooks all the raw fish in your bag at once. It needs power.", needs: { salvage: 1, copper: 1 }, item: true },
+  { id: "tank", name: "Fish tank", does: "Put fish you have caught in it and watch them swim.", needs: { glass: 3 }, item: true },
+  { id: "planter", name: "Planter", does: "Grows kelp indoors for you to pick.", needs: { kelp: 2, shell: 1 }, item: true },
+  { id: "reactor", name: "Kelp reactor", does: "Feed it kelp and it makes power for your base, even at night.", needs: { salvage: 2, copper: 2 }, item: true },
+  { id: "table", name: "Table and stools", does: "Somewhere to sit.", needs: { salvage: 1 }, item: true },
+];
+
+// ----- Supplies: things you use up, so the fabricator can make them again and again -----
+// (oven: it can only be made where there is something to cook with: at your pod, or in a room with an oven)
+const SUPPLIES = [
+  { id: "water", name: "Water bottle", does: "V: drink it when you are thirsty. (The fabricator squeezes fresh water out of kelp.)", needs: { kelp: 2 } },
+  { id: "cooked", name: "Cooked fish", does: "G: eat it when you are hungry.", needs: { fish: 1 }, oven: true },
+  { id: "medkit", name: "First aid kit", does: "H: mends 60 health.", needs: { kelp: 1, shell: 2 } },
+];
+
+// ----- Things to make at your pod -----
 // needs: what it costs. after: something you must have made first. Each one changes what you can do (see "gear" in game.js).
 const RECIPES = [
   { id: "flippers", name: "Flippers", does: "Swim much faster.", needs: { kelp: 4, shell: 3 } },
   { id: "tank1", name: "Big air tank", does: "Air for 90 seconds instead of 45.", needs: { salvage: 4, kelp: 2 } },
+  { id: "knife", name: "Dive knife", does: "Tool 5. Jab a Snapjaw or a Lanternjaw and it swims away.", needs: { salvage: 1, quartz: 1 } },
   { id: "torch", name: "Dive torch", does: "T: a bright light. It also scares Snapjaws away.", needs: { copper: 2, quartz: 1, salvage: 1 } },
   { id: "zipfin", name: "Zipfin scooter", does: "Hold Shift to zoom along.", needs: { copper: 4, salvage: 3, quartz: 2 } },
   { id: "tank2", name: "Great air tank", does: "Air for 150 seconds.", needs: { copper: 4, quartz: 3 }, after: "tank1" },
@@ -197,18 +218,22 @@ const RECIPES = [
   { id: "hull", name: "Titan hull", does: "The Bubble can go down to 560 metres, into the Abyss, and takes far less harm.", needs: { silver: 6, amethyst: 4, ember: 4 }, after: "bubble" },
 ];
 
+const ROOM = 7;              // how big a room of your base is: 7 metres from the middle to each wall (rooms are square)
+const HIGH = 5;              // how high a room is, from the floor to the ceiling
+const TUBE = 2.2;            // how wide a tunnel is, from the middle to the glass
 // ----- Things to build on the sea bed (press B) -----
+// kit: this piece is made at a fabricator first. Then the Builder puts it down.
 // Each piece of your base costs materials. "room" pieces are full of air: inside one you can breathe, rest and make gear.
 const BASE_PARTS = [
-  { id: "dome", name: "Base dome", does: "A room full of air. Inside it you can breathe, rest and make gear, and no creature can get in.", needs: { salvage: 4, quartz: 2, glass: 2 }, room: true },
-  { id: "glassdome", name: "Glass dome", does: "The same, but all glass: watch the fish swim past.", needs: { glass: 6, copper: 2 }, room: true },
-  { id: "kitchen", name: "Kitchen", does: "A room with an oven. Cook the fish you catch with your Net: a cooked fish mends you and saves your air.", needs: { salvage: 4, copper: 3, glass: 1 }, room: true },
+  { id: "dome", name: "Room", does: "An empty square room full of air, with a hatch to climb in by. No creature can get in. Go inside and press B to build things in it.", needs: { salvage: 4, quartz: 2, glass: 2 }, room: true },
+  { id: "glassdome", name: "Glass room", does: "The same, but all glass: watch the fish swim past.", needs: { glass: 6, copper: 2 }, room: true },
   { id: "lookout", name: "Lookout tower", does: "A tall tower with a glass top. From inside you can see much further, and your compass shows the nearest hunting leviathan.", needs: { salvage: 5, glass: 4, quartz: 2 }, room: true },
-  { id: "aquarium", name: "Aquarium", does: "A glass room with a tank. Put fish you have caught in it and watch them swim.", needs: { glass: 6, quartz: 2, shell: 3 }, room: true },
-  { id: "greenhouse", name: "Greenhouse", does: "A warm glass room where kelp grows fast. Pick it when you use the room.", needs: { glass: 4, kelp: 6, copper: 2 }, room: true },
   { id: "tunnel", name: "Tunnel", does: "A glass tube full of air that joins two of your rooms together.", needs: { glass: 2, salvage: 1 }, tunnel: true },
   { id: "poles", name: "Poles", does: "A platform on tall poles. Build a room on top of it to lift your base up off the sea bed.", needs: { salvage: 3 } },
-  { id: "lamp", name: "Sea lamp", does: "Lights up the water. Snapjaws keep well away from it.", needs: { copper: 1, quartz: 1 } },
-  { id: "garden", name: "Kelp garden", does: "Grows kelp for you to pick.", needs: { kelp: 3, shell: 2 } },
-  { id: "dock", name: "Sub dock", does: "Press E here to call the Bubble to your base.", needs: { salvage: 3, copper: 2 } },
+  { id: "solar", name: "Solar panel", does: "Makes power for your base while the sun is up. It works best in shallow water, where the light is strong.", needs: { quartz: 2, copper: 1 }, kit: true },
+  { id: "thermal", name: "Vent generator", does: "Makes power day and night from the heat of a hot vent. A long cable carries it back to your base.", needs: { salvage: 3, copper: 3, ember: 2 }, vent: true, kit: true },
+  { id: "beacon", name: "Beacon", does: "A flashing light with a tall pink beam. You can see it from far away, so you can always find your way back.", needs: { copper: 1, glass: 1 }, kit: true },
+  { id: "lamp", name: "Sea lamp", does: "Lights up the water. Snapjaws keep well away from it.", needs: { copper: 1, quartz: 1 }, kit: true },
+  { id: "garden", name: "Kelp garden", does: "Grows kelp for you to pick.", needs: { kelp: 3, shell: 2 }, kit: true },
+  { id: "dock", name: "Sub dock", does: "Press E here to call the Bubble to your base.", needs: { salvage: 3, copper: 2 }, kit: true },
 ];

@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Deepwild</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=7">
   </head>
   <body>
     <h1>Deepwild</h1>
-    <p id="goal">Dive under your raft and explore the sea</p>
+    <p id="goal">Dive under your pod and explore the sea</p>
     <div class="screen">
       <canvas id="game"></canvas>
       <div id="tint"></div>
@@ -20,29 +20,51 @@
         <span id="air-text"></span>
         <div class="bar small"><div id="hp-fill"></div></div>
         <span>Health</span>
+        <div class="bar small"><div id="food-fill"></div></div>
+        <span>Food</span>
+        <div class="bar small"><div id="water-fill"></div></div>
+        <span>Water</span>
       </div>
       <p id="depth"></p>
       <p id="compass"></p>
+      <p id="days"></p>
+      <p id="power"></p>
       <p id="bag"></p>
       <div id="tools"></div>
       <div id="scan" hidden><div class="bar"><div id="scan-fill"></div></div><span id="scan-text"></span></div>
       <p id="toast" hidden></p>
       <p id="prompt" hidden></p>
 
-      <!-- On the raft: make things, rest, read your journal, and dive back in -->
+      <!-- In the pod (or a room of your base). On one side: dive, rest and the pod locker. On the other side: the fabricator. -->
       <div id="raft" class="panel" hidden>
-        <h2 id="home-title">Your raft</h2>
-        <p class="small" id="bag-list"></p>
+        <h2 id="home-title">Your pod</h2>
         <button id="dive" class="big">Dive in!</button>
-        <button id="rest">Rest until morning</button>
+        <button id="rest">Rest a while</button>
         <button id="journal-button">Sea journal</button>
         <div id="room-actions"></div>
-        <h2>Make new gear</h2>
-        <div id="recipes"></div>
+        <p class="small" id="bag-list"></p>
+        <div id="locker-box">
+          <h2 id="locker-title">Pod locker</h2>
+          <p class="small" id="locker-note"></p>
+          <button id="store-all">Put everything in the locker</button>
+          <div id="locker"></div>
+        </div>
+      </div>
+      <div id="fab" class="panel right" hidden>
+        <h2>Fabricator</h2>
+        <p class="small">The machine that makes things for you. <span id="fab-note"></span></p>
+        <div id="fab-body">
+          <h2>Supplies</h2>
+          <div id="supplies"></div>
+          <h2>Base pieces</h2>
+          <div id="kits"></div>
+          <h2>Gear</h2>
+          <div id="recipes"></div>
+        </div>
       </div>
       <div id="build" class="overlay" hidden>
-        <h2>Build your base</h2>
-        <p class="small">Pick a piece, then point at the sea bed in front of you and press E. Press X next to a piece to pack it up again (you get everything back).</p>
+        <h2 id="build-title">Build your base</h2>
+        <p class="small" id="build-note"></p>
         <div id="parts"></div>
         <button id="build-close">Close</button>
       </div>
@@ -57,20 +79,20 @@
       </div>
       <div id="intro" class="overlay">
         <h2 class="logo">Deepwild</h2>
-        <p>You live on a little raft in the middle of the sea. Dive down and explore ten parts of the sea, from sunny shallows to the Abyss. Watch your air, make better gear, build your own base on the sea bed, scan the creatures, steer clear of the leviathans, and find the secret at the bottom of the sea.</p>
-        <p class="keys">Mouse (click the game first) or left and right arrows: look &nbsp; W, A, S, D: swim<br>Space: swim up &nbsp; C: swim down &nbsp; Shift: zoom (with the Zipfin scooter)<br>Inside your base you stand and walk: W, A, S, D walk, Shift runs, Space jumps (or climbs a lookout's ladder)<br>1 to 4 or mouse wheel: choose a tool (Hands, Scanner, Net, Builder) &nbsp; Left click: use it<br>E: pick up, use, climb &nbsp; T: torch &nbsp; G: eat a cooked fish &nbsp; J: sea journal<br>B: build your base &nbsp; X: pack a piece up &nbsp; R: sea whistle</p>
+        <p>You live in a little floating pod in the middle of the sea. Dive down and explore ten parts of the sea, from sunny shallows to the Abyss. Watch your air, make better gear, build your own base on the sea bed, survive the dark nights, scan the creatures, steer clear of the leviathans, and find the secret at the bottom of the sea.</p>
+        <p class="keys">Mouse (click the game first) or left and right arrows: look &nbsp; W, A, S, D: swim<br>Space: swim up &nbsp; C: swim down &nbsp; Shift: zoom (with the Zipfin scooter)<br>The rooms of your base have solid walls: press E at a room's round hatch to go in or out<br>Every room has a fabricator on its wall, by the hatch. It makes gear, supplies, and base pieces such as solar panels<br>Rooms start empty: go inside and press B to build a locker, a bed, an oven and more. A base needs power from solar panels<br>Inside your base you stand and walk: W, A, S, D walk, Shift runs, Space jumps (or climbs a lookout's ladder)<br>1 to 5 or mouse wheel: choose a tool (Hands, Scanner, Net, Builder, Knife) &nbsp; Left click: use it<br>E: pick up, use, climb &nbsp; T: torch &nbsp; J: sea journal<br>G: eat a cooked fish &nbsp; V: drink water &nbsp; H: first aid kit<br>B: build your base &nbsp; X: pack a piece up &nbsp; R: sea whistle</p>
         <button id="continue" hidden>Continue</button>
         <button id="start">New game</button>
       </div>
     </div>
-    <p class="help">Air runs out under water: swim up to the top to breathe, or climb onto your raft (E at the ladder). Every upgrade lets you go further and deeper. If you run out of air you wake up on the raft, but the sea keeps half of what you were carrying.</p>
+    <p class="help">Air runs out under water: swim up to the top to breathe, or climb into your pod (E at the ladder). Every upgrade lets you go further and deeper. If you run out of air you wake up in your pod, but the sea keeps half of what you were carrying (things in your pod locker are safe) and your count of days survived starts again.</p>
     <p><a href="../index.html">Back to the arcade</a></p>
 
     <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="../sounds.js"></script>
-    <script src="world.js?v=4"></script>
-    <script src="game.js?v=6"></script>
+    <script src="world.js?v=8"></script>
+    <script src="game.js?v=10"></script>
     <script src="../fullscreen.js"></script>
   </body>
 </html>

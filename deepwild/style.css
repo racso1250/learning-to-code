@@ -123,6 +123,8 @@ a {
 
 #depth,
 #compass,
+#days,
+#power,
 #bag {
   position: absolute;
   margin: 0;
@@ -245,7 +247,7 @@ a {
   left: 0;
   top: 0;
   bottom: 0;
-  width: 46%;
+  width: 35%;
   padding: 14px;
   overflow-y: auto;
   background: rgba(2, 12, 24, 0.86);
@@ -360,4 +362,81 @@ button.big {
 #room-actions button:disabled {
   opacity: 0.55;
   border-color: #4a6a7a;
+}
+
+/* How many days you have survived, in the top right corner */
+#days {
+  right: 12px;
+  top: 10px;
+  text-align: right;
+  color: #ffe14a;
+  font-size: 8px;
+  white-space: pre;
+}
+
+/* The fabricator is on the other side of the screen from the locker */
+.panel.right {
+  left: auto;
+  right: 0;
+}
+
+.shelf {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 4px;
+  padding: 3px 4px;
+  border: 1px solid #2a6a8a;
+  border-radius: 6px;
+}
+
+.shelf span {
+  flex: 1;
+}
+
+.shelf button {
+  margin: 0;
+  padding: 6px 7px;
+  font-size: 7px;
+}
+
+.shelf button:disabled,
+#store-all:disabled {
+  opacity: 0.45;
+  border-color: #4a6a7a;
+}
+
+#store-all {
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  font-size: 8px;
+}
+
+#food-fill {
+  height: 100%;
+  background: #ffb04a;
+}
+
+#water-fill {
+  height: 100%;
+  background: #5ab8ff;
+}
+
+/* A tool you have not made yet */
+#tools span.none {
+  opacity: 0.4;
+}
+
+/* How much power your base has, under the days counter */
+#power {
+  right: 12px;
+  top: 46px;
+  text-align: right;
+  font-size: 8px;
+}
+
+#fab-body[hidden],
+#locker-box[hidden] {
+  display: none;
 }
