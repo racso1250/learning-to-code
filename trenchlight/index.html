@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Trenchlight</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Trenchlight</h1>
+    <p id="goal">Find the four power cores in the sea under the ice</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+
+      <!-- Top left: how strong the sub's hull is, and how much battery is left -->
+      <div id="meters">
+        <div class="bar"><div id="hull-fill"></div></div>
+        <span id="hull-text">Hull</span>
+        <div class="bar"><div id="energy-fill"></div></div>
+        <span id="energy-text">Battery</span>
+      </div>
+      <p id="where"></p>
+      <p id="tally"></p>
+      <p id="gear"></p>
+      <canvas id="radar" width="150" height="150"></canvas>
+      <p id="warn" hidden></p>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <div id="hold" hidden><div class="bar"><div id="hold-fill"></div></div></div>
+
+      <!-- Parked at a dock: your store room and the workshop -->
+      <div id="dock" class="panel" hidden>
+        <h2 id="dock-title">The Lift</h2>
+        <button id="launch" class="big">Launch! (E)</button>
+        <div id="dock-body"></div>
+      </div>
+
+      <!-- The list of base pieces you can build -->
+      <div id="build" class="overlay" hidden>
+        <h2>Build your base</h2>
+        <p class="small" id="build-note">Choose a piece, then steer to where you want it and press E.</p>
+        <div id="parts"></div>
+        <button id="build-close">Close (B)</button>
+      </div>
+
+      <!-- The map of the whole crater -->
+      <div id="map" class="overlay" hidden>
+        <h2>Map of the Great Crater</h2>
+        <canvas id="chart" width="440" height="440"></canvas>
+        <p class="small">Yellow: the Lift &nbsp; Blue: your docks &nbsp; Pink: power core signals &nbsp; Red: leviathans your sonar can hear</p>
+        <button id="map-close">Close (M)</button>
+      </div>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">The Lift is alive!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep exploring</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Trenchlight</h2>
+        <p>You are the pilot of the Lantern, a little submarine in the dark sea under the ice of a frozen moon. The Lift back to the surface has lost its four power cores. Each one fell into the home of a leviathan. Drill for crystals and metal, build your own bases on the sea bed, make your sub stronger, and bring all four cores home.</p>
+        <p class="keys">W: go forward &nbsp; S: go back &nbsp; A, D or mouse (click the game first): turn<br>Arrow up and down or mouse: point the nose up and down<br>Space: rise &nbsp; C: sink &nbsp; Shift: boost<br>Hold E: drill, or grab a power core &nbsp; E: park at a dock<br>L: lights &nbsp; Q: sonar ping &nbsp; G: glow decoy &nbsp; R: shock pulse<br>B: build your base &nbsp; X: pack a piece up &nbsp; M: map</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Every layer of the crater is deeper than the last, and your hull can only take so much. Build a workshop and a turbine near a dock, then park at the dock to make your sub stronger. If your hull breaks, the sub's safety bubble floats you back to your last dock, but you lose the cargo you were carrying. Things in your store room are always safe.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="world.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="giants.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
