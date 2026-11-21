@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Farshore</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Farshore</h1>
+    <p id="goal">Find the five star stones of the old signal tower</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+      <div id="crosshair">+</div>
+
+      <!-- Top left: your health, and how much air you have left -->
+      <div id="meters">
+        <div class="bar"><div id="health-fill"></div></div>
+        <span>Health</span>
+        <div class="bar"><div id="air-fill"></div></div>
+        <span id="air-text">Air</span>
+      </div>
+      <p id="where"></p>
+      <p id="tally"></p>
+      <p id="inv"></p>
+      <p id="warn" hidden></p>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+
+      <!-- The list of things you can build -->
+      <div id="build" class="overlay" hidden>
+        <h2>Build</h2>
+        <p class="small">Choose something, then look where you want it and press E.</p>
+        <div id="parts"></div>
+        <button id="build-close">Close (B)</button>
+      </div>
+
+      <!-- The workbench: make diving gear -->
+      <div id="gear" class="overlay" hidden>
+        <h2>Workbench</h2>
+        <p class="small">Make gear from the things you have found.</p>
+        <div id="gear-list"></div>
+        <button id="gear-close">Close (E)</button>
+      </div>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">The tower is calling!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep exploring</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Farshore</h2>
+        <p>Your landing pod has come down on a far-away world of islands and warm seas. Walk the beaches, climb the hills and dive under the waves. Build your own base from room blocks, on land or under the sea. Find the five star stones to wake the old signal tower. And watch out: three leviathans live here too.</p>
+        <p class="keys">Mouse (click the game first) or arrow keys: look around &nbsp; W, A, S, D: walk or swim<br>Space: jump, swim up, climb a ladder &nbsp; C: swim down, climb down &nbsp; Shift: run<br>E: pick up, use, go through a door &nbsp; H: eat a sunfruit<br>B: build &nbsp; X: pack up a room or furniture &nbsp; L: dive light &nbsp; R: sea horn</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Your air runs out under water: swim up to the top to breathe, or go inside a room of your base (rooms are always full of air, even on the sea bed). Rooms that touch join up, and every room has a ladder to the room above or to the roof. Build a workbench in a room to make flippers, bigger air tanks and more. If you are badly hurt you wake up in your bed, and you keep all your things.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="world.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="base.js?v=1"></script>
+    <script src="giants.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
