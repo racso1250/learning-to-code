@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ra Ra Escape</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Ra Ra Escape</h1>
+    <p id="goal">Run from the giant stick bug, all the way to the lab where it was made</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+
+      <!-- Top left: how much sprint you have, and how close the stick bug is -->
+      <div id="meters">
+        <div class="bar"><div id="stamina-fill"></div></div>
+        <span>Sprint</span>
+        <div class="bar"><div id="bug-fill"></div></div>
+        <span id="bug-text"></span>
+      </div>
+      <p id="where"></p>
+      <p id="warn" hidden></p>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <div id="hold" hidden><div class="bar"><div id="hold-fill"></div></div></div>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">You escaped!</h2>
+        <p>The beam turns blue. The giant stick bug shrinks, and shrinks, until it is no longer than your finger. Then the ray swings round, and Doctor Twigg shrinks too, squeaking crossly in a tiny white coat.</p>
+        <p>You pick the little stick bug up. It sits on your hand and looks at you.</p>
+        <p>"Ra ra," it says, quietly.</p>
+        <p>You think you might keep it.</p>
+        <button id="again">Play again</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Ra Ra Escape</h2>
+        <p>One night you hear a strange noise: ra... ra... ra... It is a stick bug. Then it grows to the size of a bus, and it chases you! Run through the City, the Swamp, the Mountains and the Alaskan Redwood Forest, all the way to the evil scientist who made it.</p>
+        <p class="keys">W, A, S, D: run &nbsp; Mouse (click the game first) or left and right arrows: look round<br>Shift: sprint &nbsp; Space: jump &nbsp; E: hide, push, pull, use</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">The bar at the top shows how close the stick bug is. In the City, look at what a building is made of before you hide in it: stone and brick are strong, glass and thin wood are not. In the Swamp, stay on the boards and hide in the reeds. In the Mountains, jump the cracks and push boulders. If it catches you, you start again from the last safe spot.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="core.js?v=1"></script>
+    <script src="bug.js?v=1"></script>
+    <script src="levels.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
