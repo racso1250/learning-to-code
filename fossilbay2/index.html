@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fossil Bay 2</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Fossil Bay 2</h1>
+    <p id="goal">Build a dinosaur park across a whole island</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+
+      <!-- Along the top: your money, your stars, where you are looking, and the buttons -->
+      <div id="bar">
+        <span id="money"></span>
+        <span id="stars"></span>
+        <span id="crowd"></span>
+        <span id="place"></span>
+        <span class="gap"></span>
+        <button id="staff">Staff</button>
+        <button id="speed0" title="Pause (P)">II</button>
+        <button id="speed1" title="Normal speed">&gt;</button>
+        <button id="speed3" title="Fast (O)">&gt;&gt;&gt;</button>
+        <button id="jeep">J: jeep</button>
+      </div>
+      <div id="alerts"></div>
+      <div id="panel" class="panel" hidden></div>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <canvas id="minimap" width="120" height="120" title="Click to jump there"></canvas>
+      <div id="toolbar">
+        <div id="tabs"></div>
+        <div id="tools"></div>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">Five stars!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep building</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Fossil Bay 2</h2>
+        <p>A whole island is yours: jungle, desert, swamp and snow, cut apart by two rivers. Build monorail stations to open each biome. Hatch 25 kinds of dinosaur, sea reptile and flying reptile. Build research labs to find new DNA, and hire keepers, rangers, scientists and tour guides to help you run it all.</p>
+        <p class="keys">Mouse: point and click to build. Hold and drag for paddocks and paths. Right click: stop building<br>W, A, S, D or arrow keys: move the camera &nbsp; Q, E: turn it &nbsp; Mouse wheel or Z, X: zoom<br>Click the little map to jump across the island &nbsp; 1: Look &nbsp; 0: Bulldozer &nbsp; P: pause &nbsp; O: fast<br>J: jump in the ranger jeep. Then W, A, S, D to drive and Space to fire a sleepy dart</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New island</button>
+      </div>
+    </div>
+    <p class="help">Paths can't cross the rivers, so each biome needs its own monorail station before you can build there. Every dinosaur has a biome it likes best. New kinds have to be found by a research lab, and a lab needs a scientist. Sea reptiles live in lagoons and flying reptiles in aviaries. If the game runs slowly, add ?plain to the end of the address to switch the shadows off.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="park.js?v=1"></script>
+    <script src="dinos.js?v=1"></script>
+    <script src="staff.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
