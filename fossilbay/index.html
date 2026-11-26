@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fossil Bay</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Fossil Bay</h1>
+    <p id="goal">Build your own dinosaur park</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+
+      <!-- Along the top: your money, your stars, and the buttons for time and the jeep -->
+      <div id="bar">
+        <span id="money"></span>
+        <span id="stars"></span>
+        <span id="crowd"></span>
+        <span class="gap"></span>
+        <button id="speed0" title="Pause (P)">II</button>
+        <button id="speed1" title="Normal speed">&gt;</button>
+        <button id="speed3" title="Fast (O)">&gt;&gt;&gt;</button>
+        <button id="jeep">J: ranger jeep</button>
+      </div>
+      <div id="alerts"></div>
+      <div id="panel" class="panel" hidden></div>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <div id="tools"></div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">Five stars!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep building</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Fossil Bay</h2>
+        <p>Welcome to your very own dinosaur park. Fence in paddocks, hatch dinosaurs from eggs, and keep them fed and happy. Build paths, viewing decks and shops so visitors can come and see them. But be careful: an unhappy dinosaur will bash its fence down. If one gets out, jump in the ranger jeep and catch it!</p>
+        <p class="keys">Mouse: point and click to build. Hold and drag for paddocks and paths. Right click: stop building<br>W, A, S, D or arrow keys: move the camera &nbsp; Q, E: turn it &nbsp; Mouse wheel or Z, X: zoom<br>1 to 0: choose a tool &nbsp; P: pause &nbsp; O: fast forward<br>J: jump in the ranger jeep. Then W, A, S, D to drive and Space to fire a sleepy dart</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New park</button>
+      </div>
+    </div>
+    <p class="help">Click a paddock with the Look tool to see how its dinosaurs feel and why. Dinosaurs get angry when they are hungry, lonely, cramped, or shut in with a meat-eater. Stronger fences hold for longer. Visitors only count dinosaurs they can see, so every paddock needs a viewing deck beside it that is joined to the gate by a path.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=2"></script>
+    <script src="scene.js?v=2"></script>
+    <script src="park.js?v=1"></script>
+    <script src="dinos.js?v=2"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
