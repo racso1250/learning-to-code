@@ -99,6 +99,20 @@ function hillAt(x, z) {
   return y;
 }
 
+// A soft round glow (a picture of a fuzzy dot)
+const glowDot = (function () {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const pen = c.getContext("2d");
+  const fade = pen.createRadialGradient(32, 32, 2, 32, 32, 32);
+  fade.addColorStop(0, "rgba(255,255,255,1)");
+  fade.addColorStop(0.4, "rgba(255,255,255,0.4)");
+  fade.addColorStop(1, "rgba(255,255,255,0)");
+  pen.fillStyle = fade;
+  pen.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+
 // Everything that should throw a shadow goes through here
 function shade(thing) {
   thing.traverse(function (part) {
@@ -175,7 +189,7 @@ const wild = {};
 
   // The volcano, with a glowing top
   piece(scene, new THREE.CylinderGeometry(27, 30, 3, 14), bright(0xff7a2a), VOLCANO.x, 122, VOLCANO.z);
-  const lava = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0xff8a3a, transparent: true, opacity: 0.5, fog: false }));
+  const lava = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowDot, color: 0xff8a3a, transparent: true, opacity: 0.7, depthWrite: false, fog: false }));
   lava.scale.set(110, 60, 1);
   lava.position.set(VOLCANO.x, 135, VOLCANO.z);
   scene.add(lava);
