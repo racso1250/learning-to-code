@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fossil Bay 3</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Fossil Bay 3</h1>
+    <p id="goal">Catch wild dinosaurs and build your park from the ground</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="crosshair">+</div>
+
+      <!-- Along the top: your money, your stars, where you are, and your darts -->
+      <div id="bar">
+        <span id="money"></span>
+        <span id="stars"></span>
+        <span id="crowd"></span>
+        <span id="place"></span>
+        <span class="gap"></span>
+        <span id="darts"></span>
+        <div class="bar run"><div id="stamina-fill"></div></div>
+      </div>
+      <div id="alerts"></div>
+      <div id="panel" class="panel" hidden></div>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <canvas id="minimap" width="130" height="130"></canvas>
+
+      <!-- The list of things you can build -->
+      <div id="build" class="overlay" hidden>
+        <h2>Build</h2>
+        <p class="small">Choose something. Then look at the ground where you want it, and click.</p>
+        <div id="parts"></div>
+        <button id="build-close">Close (B)</button>
+      </div>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">Five stars!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep going</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Fossil Bay 3</h2>
+        <p>This time you are down on the ground. Walk the island's five sections: the Home Meadow, the Greenwood Forest, the Red Desert, the Frost Plateau and the Misty Swamp. Put wild dinosaurs to sleep with your dart gun, carry them home under your helicopter, and build the park around them by hand.</p>
+        <p class="keys">Mouse (click the game first) or arrow keys: look around &nbsp; W, A, S, D: walk &nbsp; Shift: run &nbsp; C: creep<br>Click or Space: fire a sleepy dart &nbsp; E: use (helicopter, darts crate, check a paddock)<br>B: build. Then look at the ground and click. Esc: stop building<br>In the helicopter: W, A, S, D to fly &nbsp; Space: up &nbsp; C: down &nbsp; E: hook, lower, get out</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Bigger dinosaurs need more darts. Plant-eaters run when they are hit; meat-eaters come straight for you. A sleeping dinosaur shows on the little map. Fly low over it and press E to hook it, then fly over a paddock and press E to lower it in. Every kind likes the section it came from best. The forest is too thick to land in: land at its edge, or clear trees with the Bulldozer. If the game runs slowly, add ?plain to the end of the address.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="park.js?v=1"></script>
+    <script src="dinos.js?v=1"></script>
+    <script src="wild.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
