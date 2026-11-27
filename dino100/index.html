@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dino Island 100</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+    <!-- game.js adds a picture of each dinosaur in here, the first time it is needed -->
+    <style id="pics"></style>
+  </head>
+  <body>
+    <h1>Dino Island 100</h1>
+    <p id="goal">Take charge of a dinosaur park, and discover all 100 dinosaurs</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+
+      <!-- Along the top: your money, your stars, where you are looking, and the buttons -->
+      <div id="bar">
+        <span id="money"></span>
+        <span id="stars"></span>
+        <span id="crowd"></span>
+        <span id="place"></span>
+        <span class="gap"></span>
+        <button id="dex-open">B: Dinodex</button>
+        <button id="staff">Staff</button>
+        <button id="speed0" title="Pause (P)">II</button>
+        <button id="speed1" title="Normal speed">&gt;</button>
+        <button id="speed3" title="Fast (O)">&gt;&gt;&gt;</button>
+        <button id="jeep">J: jeep</button>
+      </div>
+      <div id="alerts"></div>
+      <div id="panel" hidden></div>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <canvas id="minimap" width="160" height="160" title="Click to jump there"></canvas>
+      <div id="toolbar">
+        <div id="tabs"></div>
+        <div id="tools"></div>
+      </div>
+
+      <!-- The Dinodex: every dinosaur there is to find -->
+      <div id="dex" class="overlay" hidden>
+        <div id="dex-top">
+          <h2>Dinodex</h2>
+          <span id="dex-count"></span>
+          <button id="dex-close">Close (B)</button>
+        </div>
+        <div id="dex-info"></div>
+        <div id="dex-list"></div>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">100 of 100!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep building</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Dino Island 100</h2>
+        <p>You are the new boss of a dinosaur park, and it is already open. But a Velociraptor is out, a fence is nearly broken, and the Triceratops are hungry! Get the park under control. Then send expeditions across a huge island of seven regions to discover 80 kinds of dinosaur, and mix them in the lab to make 20 hybrids. Can you fill all 100 pages of your Dinodex?</p>
+        <p class="keys">Mouse: point and click. Hold and drag for paddocks and paths. Right click: stop building<br>W, A, S, D or arrow keys: move the camera &nbsp; Q, E: turn it &nbsp; Mouse wheel or Z, X: zoom<br>Click the little map to jump across the island &nbsp; B: Dinodex &nbsp; 1: Look &nbsp; 0: Bulldozer &nbsp; P: pause &nbsp; O: fast<br>J: jump in the ranger jeep. Then W, A, S, D to drive and Space to fire a sleepy dart</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Choose Look and click a paddock, the Expedition camp or the Research lab to see inside. Rare dinosaurs can only be found once your park has more stars. Every dinosaur has a region it likes best, and visitors can only cross this huge island by monorail, so build stations. The yellow dots on the map are fossil sites: drive the jeep to one to dig up a new dinosaur. If the game runs slowly, add ?plain to the end of the address to switch the shadows off.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="park.js?v=1"></script>
+    <script src="dinos.js?v=1"></script>
+    <script src="staff.js?v=1"></script>
+    <script src="layout.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
