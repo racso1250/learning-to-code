@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fossil Bay: Lights Out</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Fossil Bay: Lights Out</h1>
+    <p id="goal">You slept through the night the dinosaurs got out</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+      <div id="crosshair">+</div>
+
+      <!-- Top left: how much running you have left, and how much noise you are making -->
+      <div id="meters">
+        <div class="bar"><div id="stamina-fill"></div></div>
+        <span>Run</span>
+        <span id="noise"></span>
+      </div>
+      <p id="where"></p>
+      <p id="stuff"></p>
+      <p id="warn" hidden></p>
+      <p id="toast" hidden></p>
+      <p id="hint" hidden></p>
+      <canvas id="minimap" width="130" height="130" hidden></canvas>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">▶ Space</p>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">You escaped!</h2>
+        <p>You throw yourself through the helicopter door. "We thought everybody was off the island!" shouts the pilot. "How did you miss the sirens?"</p>
+        <p>"I am a very heavy sleeper," you say.</p>
+        <p>The helicopter lifts away. Far below, the dinosaurs of Fossil Bay wander through the empty park, and it is all theirs now.</p>
+        <button id="again">Play again</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Fossil Bay: Lights Out</h2>
+        <p>You are on holiday at the Fossil Bay dinosaur park. In the night the power fails and every dinosaur gets out. Everybody is rushed to the boats. Everybody except you: you slept right through the sirens. Now it is morning, and you are alone on the island. Find the car the rangers left behind, and get away.</p>
+        <p class="keys">Mouse (click the game first) or arrow keys: look around &nbsp; W, A, S, D: walk<br>Hold C: creep quietly &nbsp; Hold Shift: run (loud!) &nbsp; E: use, search, hide<br>Later on: click or Space to fire a sleepy dart &nbsp; G: throw a flare<br>In the car: W, A, S, D to drive &nbsp; E: get out</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Hunters notice noise. Creeping is quiet, walking is louder, running and driving are very loud, and standing still is silent. They also see further in front of their noses, so pass behind them. A T. rex can only see things that move. If a hunter is after you, get inside a building (E at a door) and wait. If you are caught, you start again from the last safe place and keep everything you have found. If the game runs slowly, add ?plain to the end of the address.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="park.js?v=1"></script>
+    <script src="layout.js?v=1"></script>
+    <script src="escape.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
