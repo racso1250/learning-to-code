@@ -61,7 +61,7 @@ function piece(parent, geometry, material, x, y, z) {
 }
 
 // A ball squashed into an egg shape: rx wide, ry tall, rz long
-const ballShape = new THREE.SphereGeometry(1, 12, 9);
+const ballShape = new THREE.SphereGeometry(1, 14, 10);
 function ball(parent, material, rx, ry, rz, x, y, z) {
   const mesh = piece(parent, ballShape, material, x, y, z);
   mesh.scale.set(rx, ry, rz);
@@ -378,12 +378,33 @@ const rain = (function () {
 // kind's "body plan", size, colours and list of features from data.js. A horn here, a sail there...
 // Every dinosaur is built with its nose pointing along "minus z" and its feet on the ground.
 
+// Smooth skin for living things. (paint() makes flat, chunky sides, which suits buildings better.)
+function hide(colour) {
+  return new THREE.MeshPhongMaterial({ color: colour, shininess: 22 });
+}
+
+// A tapering tube from one point to another. (y is up and z is front-to-back, measured from the hip.)
+function tube(parent, material, y0, z0, y1, z1, r0, r1) {
+  const mesh = piece(parent, new THREE.CylinderGeometry(r0, r1, Math.hypot(y1 - y0, z1 - z0), 8), material, 0, (y0 + y1) / 2, (z0 + z1) / 2);
+  mesh.rotation.x = Math.atan2(z0 - z1, y0 - y1);
+  return mesh;
+}
+
 // A leg: it swings from the hip. It has a fat thigh, a thinner shin, and a foot with claws.
-function makeLeg(parent, material, long, thick, x, y, z, claws) {
+// "bent" legs are for dinosaurs that walk on two legs: the knee points forward and the ankle
+// points back, like a bird's.
+function makeLeg(parent, material, long, thick, x, y, z, claws, bent) {
   const hip = new THREE.Group();
   hip.position.set(x, y, z);
-  ball(hip, material, thick * 1.3, long * 0.36, thick * 1.6, 0, -long * 0.26, 0);
-  piece(hip, new THREE.CylinderGeometry(thick * 0.8, thick * 0.55, long * 0.62, 7), material, 0, -long * 0.67, 0);
+  if (bent) {
+    ball(hip, material, thick * 1.45, thick * 1.5, thick * 1.7, 0, -long * 0.06, -long * 0.03);
+    tube(hip, material, 0, 0, -long * 0.44, -long * 0.17, thick * 1.35, thick * 0.85);
+    tube(hip, material, -long * 0.42, -long * 0.17, -long * 0.8, long * 0.1, thick * 0.85, thick * 0.5);
+    tube(hip, material, -long * 0.78, long * 0.1, -long + thick * 0.3, -thick * 0.2, thick * 0.5, thick * 0.55);
+  } else {
+    ball(hip, material, thick * 1.3, long * 0.36, thick * 1.6, 0, -long * 0.26, 0);
+    piece(hip, new THREE.CylinderGeometry(thick * 0.8, thick * 0.55, long * 0.62, 8), material, 0, -long * 0.67, 0);
+  }
   ball(hip, material, thick * 1, thick * 0.42, thick * 1.5, 0, -long + thick * 0.38, -thick * 0.6);
   if (claws) {
     const toes = piece(hip, new THREE.ConeGeometry(thick * 0.85, thick * 1.2, 3), claws, 0, -long + thick * 0.22, -thick * 2);
@@ -394,11 +415,13 @@ function makeLeg(parent, material, long, thick, x, y, z, claws) {
   return hip;
 }
 
-// A tail: a long cone that sways from where it joins the body
+// A tail: thick where it joins the body, thinning to a point. It sways from the root.
 function makeTail(parent, material, long, thick, x, y, z) {
   const root = new THREE.Group();
   root.position.set(x, y, z);
-  const cone = piece(root, new THREE.ConeGeometry(thick, long, 8), material, 0, 0, long / 2);
+  ball(root, material, thick, thick, thick, 0, 0, 0);
+  tube(root, material, 0, 0, 0, long * 0.5, thick, thick * 0.5).rotation.x = -Math.PI / 2;
+  const cone = piece(root, new THREE.ConeGeometry(thick * 0.5, long * 0.5, 8), material, 0, 0, long * 0.75);
   cone.rotation.x = Math.PI / 2;
   parent.add(root);
   return root;
@@ -427,10 +450,10 @@ function makeDino(kind) {
   const L = sp.size * BIG;
   const has = function (feat) { return sp.feats.includes(feat); };
   const g = new THREE.Group();
-  const skin = paint(sp.a);
-  const belly = paint(sp.b);
-  const trim = paint(sp.c);
-  const dark = paint(new THREE.Color(sp.a).multiplyScalar(0.65).getHex());
+  const skin = hide(sp.a);
+  const belly = hide(sp.b);
+  const trim = hide(sp.c);
+  const dark = hide(new THREE.Color(sp.a).multiplyScalar(0.62).getHex());
   const horn = paint(0xf4ecd8);
   const eye = bright(0xfff4a0);
   const legs = [];
@@ -447,6 +470,10 @@ function makeDino(kind) {
   const topAt = function (z) { return hipH + ry * Math.sqrt(Math.max(0, 1 - z * z / (rz * rz))); };
   ball(g, skin, rx, ry, rz, 0, hipH, 0);
   ball(g, belly, rx * 0.85, ry * 0.8, rz * 0.85, 0, hipH - ry * 0.25, 0);
+  // A darker back, big shoulders at the front, and big hips at the back
+  ball(g, dark, rx * 0.9, ry * 0.6, rz * 0.93, 0, hipH + ry * 0.5, 0);
+  ball(g, skin, rx * 0.97, ry * 0.9, rz * 0.45, 0, hipH + ry * 0.04, -rz * 0.5);
+  ball(g, skin, rx * 1.04, ry * 0.98, rz * 0.45, 0, hipH, rz * (plan.quad ? 0.5 : 0.25));
   const tailLong = plan.tail * L * (has("whip") ? 1.35 : 1);
   const tail = makeTail(g, skin, tailLong, ry * 0.7, 0, hipH, rz * 0.8);
 
@@ -470,12 +497,20 @@ function makeDino(kind) {
   const hy0 = Math.sin(up) * nl + hy * 0.3;      // the middle of the head: how high...
   const hz0 = -Math.cos(up) * nl - hz * 0.55;    // ...and how far forward
   ball(head, skin, hx, hy, hz, 0, hy0, hz0);
-  // Eyes, each with a dark pupil
+  // Eyes, each with a dark pupil, a tiny white shine, and a brow above it. And two nostrils.
   const iris = has("redeyes") ? bright(0xff2a1a) : eye;
   const pupil = bright(0x1a1a1a);
   for (const s of [-1, 1]) {
     piece(head, ballShape, iris, s * hx * 0.82, hy0 + hy * 0.3, hz0 - hz * 0.2).scale.setScalar(hx * 0.22);
     piece(head, ballShape, pupil, s * hx * 0.97, hy0 + hy * 0.3, hz0 - hz * 0.26).scale.setScalar(hx * 0.11);
+    piece(head, ballShape, bright(0xffffff), s * hx * 1.03, hy0 + hy * 0.38, hz0 - hz * 0.3).scale.setScalar(hx * 0.045);
+    ball(head, dark, hx * 0.2, hy * 0.14, hz * 0.3, s * hx * 0.72, hy0 + hy * 0.6, hz0 - hz * 0.2);
+    piece(head, ballShape, pupil, s * hx * 0.3, hy0 + hy * 0.42, hz0 - hz * 0.9).scale.setScalar(hx * 0.07);
+  }
+  if (plan.jaw) {
+    // Hunters get a long strong snout, and the inside of the mouth is dark red
+    ball(head, skin, hx * 0.82, hy * 0.72, hz * 0.7, 0, hy0 - hy * 0.04, hz0 - hz * 0.5);
+    ball(head, bright(0x6a1418), hx * 0.66, hy * 0.2, hz * 0.75, 0, hy0 - hy * 0.42, hz0 - hz * 0.25);
   }
   ball(head, skin, Math.max(hy * 0.9, 0.028 * L), ry * 0.5, ry * 0.5, 0, 0, 0);       // a smooth join where the neck meets the body
   // Stripes across the back. (Not on the ones with armour or plates, which have enough going on.)
@@ -510,7 +545,7 @@ function makeDino(kind) {
   } else {
     const armLong = plan.arm * L * (has("longarms") ? 2.2 : 1);
     for (const s of [-1, 1]) {
-      legs.push(makeLeg(g, skin, hipH, thick, s * rx * 0.75, hipH, rz * 0.25, horn));
+      legs.push(makeLeg(g, skin, hipH, thick, s * rx * 0.75, hipH, rz * 0.25, horn, true));
       const arm = makeLeg(g, skin, armLong, thick * 0.4, s * rx * 0.8, hipH + ry * 0.05, -rz * 0.6, horn);
       legs.push(arm);
       if (has("longarms")) cone(arm, horn, thick * 0.3, armLong * 0.5, 0, -armLong * 1.1, -thick).rotation.x = Math.PI;
@@ -651,9 +686,9 @@ function makeSwimmer(kind) {
   const L = sp.size * BIG;
   const has = function (feat) { return sp.feats.includes(feat); };
   const g = new THREE.Group();
-  const skin = paint(sp.a);
-  const belly = paint(sp.b);
-  const dark = paint(sp.c);
+  const skin = hide(sp.a);
+  const belly = hide(sp.b);
+  const dark = hide(sp.c);
   const swan = has("swanneck");
   const rx = (swan ? 0.11 : 0.085) * L;
   const ry = (swan ? 0.085 : 0.075) * L;
@@ -711,9 +746,9 @@ function makeFlyer(kind) {
   const L = sp.size * BIG;
   const has = function (feat) { return sp.feats.includes(feat); };
   const g = new THREE.Group();
-  const skin = paint(sp.a);
-  const belly = paint(sp.b);
-  const trim = paint(sp.c);
+  const skin = hide(sp.a);
+  const belly = hide(sp.b);
+  const trim = hide(sp.c);
   const up = 0.12 * L;                                   // the body hangs this high, so its feet touch the ground
   ball(g, skin, 0.055 * L, 0.05 * L, 0.13 * L, 0, up, 0);
   ball(g, belly, 0.046 * L, 0.038 * L, 0.11 * L, 0, up - 0.016 * L, 0);

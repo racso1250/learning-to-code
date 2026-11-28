@@ -33,7 +33,7 @@ function hatch(kind, pad) {
   const sp = SPECIES[kind];
   if (!state.known[kind]) return "You have not discovered that dinosaur yet";
   // Every creature needs the right kind of home
-  const fits = pad.kind === "water" ? "water" : pad.kind === "air" ? "air" : "land";
+  const fits = wet(pad) ? "water" : pad.kind === "air" ? "air" : "land";
   if (sp.home !== fits) return sp.name + " needs " + (sp.home === "water" ? "a lagoon" : sp.home === "air" ? "an aviary" : "a paddock on dry land");
   if (pad.kind === "den" && sp.plan !== "R") return "Only raptors can live in a raptor den";
   if (sp.vault && pad.kind !== "vault") return sp.name + " is far too strong for that. Only a Titan Vault can hold it";
@@ -47,6 +47,15 @@ function hatch(kind, pad) {
     grow: 0, hunger: 80, comfort: 80, mood: "egg", loose: false, why: [], hatchAt: state.time + 8, wake: 0,
   });
   return "";
+}
+
+// The star of a stadium's feeding show: the biggest creature in the pool
+function showStar(pad) {
+  let star = null;
+  for (const d of state.dinos) {
+    if (d.pad === pad.id && d.mood !== "egg" && !d.loose && (!star || SPECIES[d.kind].size * d.grow > SPECIES[star.kind].size * star.grow)) star = d;
+  }
+  return star;
 }
 
 // Send a dinosaur away to another park. You get a quarter of its money back.
@@ -93,7 +102,7 @@ function feel(d, pad, dt) {
   }
   if (pad.kind === "den") {
     comfort += 12;       // raptors feel safe in a den, wherever it is
-  } else if (pad.kind !== "pit" && pad.kind !== "vault" && padBiome(pad) !== sp.biome) {
+  } else if (pad.kind !== "pit" && pad.kind !== "vault" && pad.kind !== "arena" && padBiome(pad) !== sp.biome) {
     comfort -= 20;
     why.push("not quite at home: it likes " + BIOMES[sp.biome].name + " best");
   }
@@ -149,7 +158,7 @@ function graze(d, pad, L, dt) {
     return;
   }
   if (!L.goal) {
-    const gap = 2.5;
+    const gap = pad.kind === "arena" ? 11 : 2.5;      // (in a stadium, the pool is in the middle, inside the seats)
     L.goal = {
       x: pad.i0 * TILE - HALF + gap + Math.random() * ((pad.i1 - pad.i0 + 1) * TILE - gap * 2),
       z: pad.k0 * TILE - HALF + gap + Math.random() * ((pad.k1 - pad.k0 + 1) * TILE - gap * 2),
@@ -341,7 +350,8 @@ function updateDinos(dt) {
       L.ramSpot = null;
     }
     // (Sea reptiles can't climb out of a lagoon, however cross they are.)
-    if (d.mood === "angry" && pad.kind !== "water") ram(d, pad, L, dt);
+    if (d.mood === "angry" && !wet(pad)) ram(d, pad, L, dt);
+    else if (showOn(pad) && d === showStar(pad)) walkTo(d, L, padMid(pad).x, (pad.k0 * TILE - HALF) + 23, SPECIES[d.kind].speed, dt);   // to the bait!
     else graze(d, pad, L, dt);
   }
 }
@@ -377,6 +387,10 @@ function poseDinos(t) {
     let high = 0;
     if (home === "air" && !asleep) high = 4 + SHAPES[d.kind].long * 0.15 + Math.sin(t * 0.7 + d.id) * 1.2;
     else if (home === "water" && !d.loose) high = -SHAPES[d.kind].tall * 0.55 * big + Math.sin(t * 1.1 + d.id) * 0.12;
+    // The star of a feeding show leaps right out of the water, again and again
+    const pool = padById(d.pad);
+    const leap = pool && showOn(pool) && d === showStar(pool) && !asleep ? Math.max(0, Math.sin((pool.showUntil - state.time) * 1.8)) : 0;
+    high += leap * 7;
     L.high = high;
     m.group.position.set(d.x, high + (d.mood === "lift" ? L.up || 0 : 0) + (asleep ? SHAPES[d.kind].long * 0.08 * big : 0), d.z);
     m.group.rotation.set(0, d.yaw, asleep ? 1.35 : 0);
@@ -389,6 +403,10 @@ function poseDinos(t) {
     // Head down to eat, or thrown forward to bash the fence
     const bash = d.mood === "angry" && L.ram > 0 && !d.loose ? Math.max(0, Math.sin(t * 7)) * 0.35 : 0;
     m.head.rotation.x = L.eating > 0 ? -0.5 - Math.sin(t * 6) * 0.08 : -bash;
+    if (leap > 0) {
+      m.group.rotation.x = leap * 0.9;       // nose up, jaws wide
+      if (m.jaw) m.jaw.rotation.x = -0.7;
+    }
     if (m.wings) {
       for (const wing of m.wings) wing.group.rotation.z = wing.side * (asleep ? -0.25 : Math.sin(t * 5 + d.id) * 0.5);
     }

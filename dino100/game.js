@@ -206,7 +206,13 @@ function padPanel(pad) {
   html += keptPads[pad.id] ? '<br><span class="got">A keeper is looking after it.</span>' : "";
   html += "</p>";
   const max = padMax(pad);
-  if (pad.kind !== "water") {
+  if (pad.kind === "arena") {
+    // The feeding show
+    const waiting = Math.ceil((pad.nextShow || 0) - state.time);
+    html += '<p class="small">' + (showOn(pad) ? '<span class="got">SHOW TIME! The crowd is going wild.</span>' : "Dangle a big fish from the crane, and the biggest creature in the pool leaps up to grab it. Every visitor near enough pays $8 to watch. (A tour guide puts on shows for free.)") + "</p>";
+    html += '<button data-act="show"' + (showOn(pad) || waiting > 0 || state.money < 100 ? " disabled" : "") + ">" + (waiting > 0 && !showOn(pad) ? "Next show in " + waiting + " seconds" : "Start a feeding show: $100") + "</button>";
+  }
+  if (!wet(pad)) {
     const wallName = pad.kind === "land" ? FENCES[pad.fence].name : pad.kind === "air" ? "Net" : pad.kind === "vault" ? "Walls and doors" : "Bars";
     html += '<p class="small">' + wallName + ": " + Math.ceil(pad.hp) + " of " + Math.round(max) + (pad.breach ? ' <span class="need">BROKEN!</span>' : "") + "</p>";
     if (pad.hp < max) html += '<button data-act="fix"' + (state.money < fixCost(pad) ? " disabled" : "") + ">Mend it: $" + fixCost(pad) + "</button>";
@@ -238,7 +244,7 @@ function padPanel(pad) {
   html += "<h2>Hatch an egg here</h2>";
   // The kinds you know, with the ones that like this region first, and then the cheapest first
   // (Only the ones that can live in this sort of home.)
-  const fits = pad.kind === "water" ? "water" : pad.kind === "air" ? "air" : "land";
+  const fits = wet(pad) ? "water" : pad.kind === "air" ? "air" : "land";
   const kinds = Object.keys(state.known).filter(function (kind) {
     const sp = SPECIES[kind];
     if (sp.home !== fits || (pad.kind === "den" && sp.plan !== "R")) return false;
@@ -324,6 +330,8 @@ function panelAct(act) {
     attempt(startResearch(selected.key, act.slice(4)));
   } else if (!pad) {
     return;
+  } else if (act === "show") {
+    attempt(startShow(pad, false));
   } else if (act === "doors") {
     pad.open = !pad.open;
     sound(function () { playNoise(0, 0.9, 200, 90, 0.3); playTone(0, 0.9, 80, 60, 0.2); });
@@ -367,7 +375,7 @@ function drawAlerts() {
   for (const pad of state.pads) {
     const angry = state.dinos.filter(function (d) { return d.pad === pad.id && d.mood === "angry" && !d.loose; });
     if (!angry.length) continue;
-    lines.push('<p class="bad" data-pad="' + pad.id + '">' + SPECIES[angry[0].kind].name + " in paddock " + (state.pads.indexOf(pad) + 1) + " is ANGRY" + (pad.kind === "water" ? "" : " and bashing its way out (" + Math.round(pad.hp / padMax(pad) * 100) + "% left)") + ". Click here to see why.</p>");
+    lines.push('<p class="bad" data-pad="' + pad.id + '">' + SPECIES[angry[0].kind].name + " in paddock " + (state.pads.indexOf(pad) + 1) + " is ANGRY" +  (wet(pad) ? "" : " and bashing its way out (" + Math.round(pad.hp / padMax(pad) * 100) + "% left)") + ". Click here to see why.</p>");
   }
   // Hungry dinosaurs with no feeder, and fences that are nearly broken
   for (const pad of state.pads) {
@@ -883,7 +891,7 @@ function drawMap() {
     pen.fillRect(n[0], n[1], 1.5, 1.5);
   }
   for (const pad of state.pads) {
-    pen.strokeStyle = { land: "#5a3a1a", water: "#1a5a9a", air: "#ffffff", den: "#3a3a44", pit: "#8a1a1a", vault: "#000000" }[pad.kind];
+    pen.strokeStyle = { land: "#5a3a1a", water: "#1a5a9a", air: "#ffffff", den: "#3a3a44", pit: "#8a1a1a", vault: "#000000", arena: "#1a5a9a" }[pad.kind];
     pen.lineWidth = 1.5;
     pen.strokeRect(pad.i0, pad.k0, pad.i1 - pad.i0 + 1, pad.k1 - pad.k0 + 1);
   }
@@ -1072,6 +1080,11 @@ function draw(dt) {
     const fence = padGroups[pad.id];
     if (!fence) continue;
     fence.userData.postPaint.emissive.setHex(state.time - (pad.hitAt || -9) < 0.5 && Math.sin(wall * 20) > 0 ? 0xaa1a0a : 0x000000);
+    // A stadium's bait swings on its rope. In a show it is lowered right down to the water.
+    if (fence.userData.bait) {
+      fence.userData.bait.rotation.z = Math.sin(wall * 1.4) * 0.12;
+      fence.userData.bait.position.y += ((showOn(pad) ? 10.5 : 14.3) - fence.userData.bait.position.y) * Math.min(1, dt * 2);
+    }
     // A vault's doors slide slowly apart, or back together
     for (const door of fence.userData.doors || []) {
       const to = door.shut + (pad.open ? door.side * door.slide : 0);

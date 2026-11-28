@@ -280,6 +280,7 @@ const PADS = {
   den:   { name: "Raptor den", per: 40, hp: 700, side: 8 },
   vault: { name: "Titan Vault", per: 150, hp: 6000, side: 11 },
   pit:   { name: "Needle Pit", per: 90, hp: 2500, side: 9 },
+  arena: { name: "Mosasaur Stadium", per: 70, hp: 99999, side: 13 },
 };
 
 // ----- Things you can build -----
@@ -289,6 +290,7 @@ const TOOLS = {
   paddock:  { name: "Paddock",         group: "homes", pad: "land", what: "Hold the mouse button and drag a box. A fence goes round it" },
   lagoon:   { name: "Lagoon",          group: "homes", pad: "water", what: "A pool for sea reptiles. Drag a box. They can never climb out" },
   aviary:   { name: "Aviary",          group: "homes", pad: "air", what: "A net dome for flying reptiles. Drag a box" },
+  arena:    { name: "Mosasaur Stadium", group: "homes", pad: "arena", stars: 2, what: "A deep pool with stands for the crowd and a feeding crane, 13 squares each way. Put on a feeding show and watch your biggest sea reptile leap! Click to build" },
   den:      { name: "Raptor den",      group: "homes", pad: "den", what: "A rocky cave behind high walls, 8 squares each way. Raptors love it, and so do visitors. Click to build" },
   pit:      { name: "Needle Pit",      group: "homes", pad: "pit", stars: 2, what: "A cage with a roof of steel, 9 squares each way. Needleback climbs over any fence, so this is the only thing that can hold it. Click to build" },
   vault:    { name: "Titan Vault",     group: "homes", pad: "vault", stars: 3, what: "A giant fortress, 11 squares each way, with huge doors you open and close. The only thing that can hold the Overlord. Click to build" },

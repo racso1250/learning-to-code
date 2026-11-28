@@ -145,6 +145,13 @@ function updateStaff(dt) {
     }
   }
 
+  // A tour guide puts on a free feeding show at every stadium, every couple of minutes
+  if (state.staff.guide > 0) {
+    for (const pad of state.pads) {
+      if (pad.kind === "arena" && state.time > (pad.nextShow || 0) + 60) startShow(pad, true);
+    }
+  }
+
   // Each lab or camp with a job gets on with it, as long as it has a scientist
   for (const key of busyLabs) {
     const lab = state.labs[key];

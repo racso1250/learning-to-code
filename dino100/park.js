@@ -52,9 +52,43 @@ function wallCost(p) {
   return p.kind === "land" ? FENCES[p.fence].per : PADS[p.kind].per;
 }
 
+// Is this home full of water? (A lagoon, or a Mosasaur Stadium.)
+function wet(p) {
+  return p.kind === "water" || p.kind === "arena";
+}
+
+// Is a feeding show going on in this stadium right now?
+function showOn(p) {
+  return p.kind === "arena" && state.time < (p.showUntil || 0);
+}
+
+// Start a feeding show. It gives back "" when it worked, or the reason why not.
+function startShow(p, free) {
+  const stars = state.dinos.filter(function (d) { return d.pad === p.id && d.mood !== "egg" && !d.loose; });
+  if (!stars.length) return "There is nothing in the pool to put on a show";
+  if (state.time < (p.nextShow || 0)) return "The star of the show is still full. Wait a little";
+  if (!free && state.money < 100) return "You need $100 for the bait";
+  if (!free) state.money -= 100;
+  p.showUntil = state.time + 14;
+  p.nextShow = state.time + 60;
+  // Everybody close enough to see buys a ticket, and loves it
+  const middle = padMid(p);
+  let crowd = 0;
+  for (const g of guests) {
+    if (g.ride > 0 || Math.hypot(g.x - middle.x, g.z - middle.z) > 70) continue;
+    crowd++;
+    g.joy += 12;
+  }
+  state.money += crowd * 8;
+  soundRoar();
+  say("SHOW TIME! " + (crowd ? crowd + " visitors paid $" + crowd * 8 + " to watch." : "Nobody was near enough to watch. Put paths and decks beside the stadium."), 6);
+  return "";
+}
+
 // How vault doors and visitors change what a paddock's dinosaurs are worth.
 // Visitors love a raptor den. A vault is only a real show while its doors are open.
 function padShow(p) {
+  if (p.kind === "arena") return showOn(p) ? 2.6 : 1.7;
   return p.kind === "den" ? 1.4 : p.kind === "pit" ? 1.3 : p.kind === "vault" ? (p.open ? 1.5 : 0.4) : 1;
 }
 
@@ -295,6 +329,41 @@ function makeLagoon(p, g, x0, z0, wide, deep) {
   return g;
 }
 
+// A Mosasaur Stadium: a deep pool, rows of seats on three sides, a glass wall at the front,
+// and a crane that dangles a big fish over the water. (game.js makes the fish swing.)
+function makeStadium(p, g, x0, z0, wide, deep) {
+  const middle = padMid(p);
+  const W = wide * TILE;
+  const D = deep * TILE;
+  const stone = paint(0xc8c8c0);
+  g.userData.postPaint = stone;
+  piece(g, new THREE.BoxGeometry(W - 12, 0.6, D - 8), new THREE.MeshPhongMaterial({ color: 0x1f6ab8, transparent: true, opacity: 0.85, shininess: 160 }), middle.x, 0.5, middle.z + 2);
+  piece(g, new THREE.BoxGeometry(W - 12, 0.1, D - 8), paint(0x0f3a6a), middle.x, 0.1, middle.z + 2);
+  // The seats: three steps up, at the back and down both sides
+  const seats = [paint(0x4a7ad8), paint(0xf4f4f4), paint(0xd8442e)];
+  for (let n = 0; n < 3; n++) {
+    const back = piece(g, new THREE.BoxGeometry(W - n * 2.6, 1.3 + n * 1.3, 2.6), seats[n], middle.x, (1.3 + n * 1.3) / 2, z0 + 6.6 - n * 2.6);
+    back.castShadow = true;
+    for (const s of [-1, 1]) piece(g, new THREE.BoxGeometry(2, 1.3 + n * 1.3, D - 8), seats[n], middle.x + s * (W / 2 - 5 + n * 2), (1.3 + n * 1.3) / 2, middle.z + 2).castShadow = true;
+  }
+  // A low wall of glass at the front, so people on a viewing deck can see in
+  piece(g, new THREE.BoxGeometry(W - 8, 2.4, 0.3), new THREE.MeshPhongMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.45, shininess: 140 }), middle.x, 1.2, z0 + D - 0.4);
+  for (const s of [-1, 1]) piece(g, new THREE.BoxGeometry(1, 3, 1), stone, middle.x + s * (W / 2 - 4), 1.5, z0 + D - 0.4).castShadow = true;
+  // The crane, with its bait
+  const steel = paint(0xffb02a);
+  piece(g, new THREE.CylinderGeometry(0.5, 0.7, 15, 8), steel, middle.x, 7.5, z0 + 9).castShadow = true;
+  const arm = piece(g, new THREE.BoxGeometry(0.7, 0.7, 16), steel, middle.x, 14.6, z0 + 16);
+  arm.castShadow = true;
+  const bait = new THREE.Group();
+  bait.position.set(middle.x, 14.3, z0 + 23);
+  piece(bait, new THREE.CylinderGeometry(0.05, 0.05, 5, 4), paint(0x2a2a30), 0, -2.5, 0);
+  ball(bait, paint(0x8a9aa8), 0.5, 0.6, 1.6, 0, -5.6, 0);
+  piece(bait, new THREE.ConeGeometry(0.6, 0.9, 4), paint(0x6a7a88), 0, -5.6, 1.9).rotation.x = -Math.PI / 2;
+  g.add(bait);
+  g.userData.bait = bait;
+  return g;
+}
+
 // A Titan Vault: towering concrete walls, a tower on every corner, and two giant doors on the
 // south side that slide apart. (game.js moves the doors: they are kept in g.userData.doors.)
 function makeVault(p, g, x0, z0, wide, deep) {
@@ -350,6 +419,7 @@ function makeFence(p) {
   const deep = p.k1 - p.k0 + 1;
   if (p.kind === "water") return makeLagoon(p, g, x0, z0, wide, deep);
   if (p.kind === "vault") return makeVault(p, g, x0, z0, wide, deep);
+  if (p.kind === "arena") return makeStadium(p, g, x0, z0, wide, deep);
   const look = p.kind === "land" ? FENCE_LOOKS[p.fence] : WALL_LOOKS[p.kind];
   const high = p.kind === "land" ? FENCES[p.fence].high : look.high;
   const electric = p.kind === "land" && p.fence === "electric";
@@ -478,7 +548,7 @@ function refreshPark() {
   for (const key in wild) {
     const at = key.split(",").map(Number);
     const pad = padAt(at[0], at[1]);
-    showWild(key, !state.tiles[key] && !(pad && (pad.kind === "water" || pad.kind === "pit" || pad.kind === "vault")));
+    showWild(key, !state.tiles[key] && !(pad && (wet(pad) || pad.kind === "pit" || pad.kind === "vault")));
   }
   for (const id in padGroups) delete padGroups[id];
   for (const p of state.pads) {
