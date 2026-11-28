@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Treetop Island</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Treetop Island</h1>
+    <p id="goal">Design your treehouse, then live on an island full of dinosaurs</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+      <div id="splat"></div>
+
+      <!-- Everything you see while you play: bars, your bag, the clock and the map -->
+      <div id="hud" hidden>
+        <div id="meters">
+          <div class="bar"><div id="health-fill"></div></div><span>Health</span>
+          <div class="bar"><div id="food-fill"></div></div><span>Food</span>
+          <div class="bar"><div id="run-fill"></div></div><span>Run</span>
+        </div>
+        <p id="clock"></p>
+        <div id="bag"></div>
+        <p id="keys-line"></p>
+        <canvas id="map" width="150" height="150"></canvas>
+        <div id="crosshair">+</div>
+        <p id="hint" hidden></p>
+      </div>
+      <p id="toast" hidden></p>
+
+      <!-- The treehouse designer -->
+      <div id="designer" hidden>
+        <h2>Design your treehouse</h2>
+        <div id="design-choices"></div>
+        <h3>Its name</h3>
+        <input id="design-name" type="text" maxlength="18" value="My Treehouse">
+        <div class="row">
+          <button id="design-left" title="Turn the view">&lt; Turn</button>
+          <button id="design-right" title="Turn the view">Turn &gt;</button>
+        </div>
+        <button id="design-done" class="big">Start living here!</button>
+      </div>
+
+      <!-- The workbench -->
+      <div id="make" class="overlay" hidden>
+        <h2>Your workbench</h2>
+        <div id="make-list"></div>
+        <p><button id="make-design">Change my treehouse design</button> <button id="make-close">Close (E)</button></p>
+      </div>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">Press Space</p>
+      </div>
+
+      <div id="name" class="overlay" hidden>
+        <h2 class="logo">It hatched!</h2>
+        <p>The egg in your nest box has cracked open, and a baby raptor is blinking up at you. What will you call it?</p>
+        <input id="pet-name" type="text" maxlength="14" placeholder="Pip">
+        <button id="name-done" class="big">That's its name</button>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">Ruler of the island!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep living here</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Treetop Island</h2>
+        <p>You live in a giant tree, in a forest, on an island full of dinosaurs. First you design your treehouse. Then you climb down into the forest to find food, make tools, and build on new parts. Watch out for raptors and the T. rex, and be back in your hammock before dark!</p>
+        <p class="keys">W, A, S, D: walk &nbsp; Mouse or arrow keys: look &nbsp; Shift: run &nbsp; C: sneak<br>E: pick up, climb, chop, use &nbsp; Q: eat &nbsp; Space or click: jab with your spear<br>T: torch &nbsp; H: horn (when you have built them)</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New game</button>
+      </div>
+    </div>
+    <p class="help">Nothing can reach you up in your treehouse. Raptors hate deep water, small dinosaurs are scared of fire, and the T. rex can't see you if you stand perfectly still. Triceratops and Stegosaurus only want to be left alone: a "?" over their head means back away. If the game runs slowly, add ?plain to the end of the address to switch the shadows off.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="dinos.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
