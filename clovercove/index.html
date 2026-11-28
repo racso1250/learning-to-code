@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Clover Cove</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Clover Cove</h1>
+    <p id="goal">A little house, friendly neighbours, and all the time in the world</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+
+      <!-- Everything you see while you play: the clock, your coins and your tools -->
+      <div id="hud" hidden>
+        <p id="clock"></p>
+        <p id="coins"></p>
+        <div id="tools"></div>
+        <p id="keys-line">E: do things &nbsp; Space: use your tool &nbsp; B: pockets &nbsp; J: journal &nbsp; Shift: run</p>
+        <p id="hint" hidden></p>
+      </div>
+      <p id="toast" hidden></p>
+
+      <!-- Somebody talking -->
+      <div id="talk" hidden>
+        <span id="talk-who"></span>
+        <p id="talk-text"></p>
+        <div id="talk-choices"></div>
+      </div>
+
+      <!-- Your pockets, your journal, or the shop -->
+      <div id="panel" class="overlay" hidden></div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Clover Cove</h2>
+        <p>You have just moved to a tiny village by the sea. Shake trees for fruit, catch bugs and fish, dig up fossils for the museum, make friends with your animal neighbours, and fill your house with furniture. There is no hurry and no way to lose.</p>
+        <div id="looks">
+          <p>Your name: <input id="your-name" type="text" maxlength="12" value="Clover"></p>
+          <p>Hair: <span id="hairs"></span></p>
+          <p>Shirt: <span id="shirts"></span></p>
+        </div>
+        <p class="keys">W, A, S, D or arrow keys: walk &nbsp; Shift: run &nbsp; E: pick up, talk, shake, go in<br>1, 2, 3, 4: hands, net, rod, shovel &nbsp; Space: use your tool &nbsp; B: pockets &nbsp; J: journal</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start" class="big">Move in!</button>
+      </div>
+    </div>
+    <p class="help">Bugs fly away if you run at them, so walk. Fish nibble a few times first: only press Space when the float goes right under. Different bugs and fish come out in each season, and some only at night. A day lasts ten minutes, and sleeping in your bed skips to morning. Your journal (J) gives hints about what you have not found yet. If the game runs slowly, add ?plain to the end of the address to switch the shadows off.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="life.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>
