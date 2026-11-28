@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Camp Fossil Bay</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+  </head>
+  <body>
+    <h1>Camp Fossil Bay</h1>
+    <p id="goal">Six campers. One island full of dinosaurs. Nobody gets left behind</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+
+      <!-- Everything you see while you play: hearts, your friends, and what you are carrying -->
+      <div id="hud" hidden>
+        <p id="hearts"></p>
+        <p id="items"></p>
+        <div id="party"></div>
+        <p id="hint" hidden></p>
+      </div>
+      <p id="toast" hidden></p>
+
+      <!-- Somebody talking -->
+      <div id="talk" hidden>
+        <span id="talk-who"></span>
+        <p id="talk-text"></p>
+        <span class="next">E</span>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">Everybody is safe!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Play again</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Camp Fossil Bay</h2>
+        <p>It was meant to be the best summer camp ever: a week on an island with real dinosaurs. Then the storm came, the fences went down, and the ferry left without you. Find your five friends, use what each of them is good at, and cross the island to the radio on the hill. And look after Bonk.</p>
+        <p class="keys">W, A, S, D or arrow keys: walk &nbsp; Shift: run &nbsp; E: do things<br>1 to 6 (or Tab): swap to another camper &nbsp; Q: use their skill &nbsp; G: throw a flare</p>
+        <button id="continue" hidden>Continue from the last campfire</button>
+        <button id="start" class="big">Start</button>
+      </div>
+    </div>
+    <p class="help">Each camper can do one thing the others can't, so swap between them with the number keys. Long grass hides you from raptors: stay out of their red view cones, and don't run near them. Campfires give all your hearts back and save the game. If you run out of hearts, everybody just runs back to the last campfire. If the game runs slowly, add ?plain to the end of the address to switch the shadows off.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="dinos.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>

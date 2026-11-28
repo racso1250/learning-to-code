@@ -1,0 +1,290 @@
+/* Camp Fossil Bay: campfire orange, tent green and night-sky blue */
+
+body {
+  background: linear-gradient(#3f6a5a, #1a2a3a);
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px 16px;
+  color: #fffbe8;
+  font-family: "Press Start 2P", monospace;
+  text-align: center;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0 0 12px;
+  color: #ffb84a;
+  text-shadow: 3px 3px 0 #5a2a0a;
+}
+
+h2 {
+  font-size: 12px;
+  color: #ffd76a;
+  margin: 0 0 10px;
+}
+
+a {
+  color: #fffbe8;
+  font-size: 10px;
+}
+
+#goal {
+  max-width: 960px;
+  margin: 0 auto 8px;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #ffe9a8;
+}
+
+.help {
+  max-width: 900px;
+  margin: 12px auto;
+  font-size: 8px;
+  line-height: 1.8;
+  color: #c8dcd0;
+}
+
+/* The game sits in a frame, and everything else is laid on top of it */
+.screen {
+  position: relative;
+  max-width: 960px;
+  margin: 0 auto;
+  border: 4px solid #ffb84a;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #a8dcf4;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+/* A red flash round the edge when you are hurt */
+#tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: box-shadow 0.25s;
+}
+
+#hud[hidden] {
+  display: none;
+}
+
+#hearts,
+#items {
+  position: absolute;
+  top: 10px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(20, 40, 40, 0.75);
+  font-size: 9px;
+  pointer-events: none;
+}
+
+#hearts {
+  left: 10px;
+  font-size: 14px;
+  color: #6a5a5a;
+}
+
+#hearts b {
+  color: #ff5a6a;
+  font-weight: normal;
+}
+
+#items {
+  right: 10px;
+  color: #ffe14a;
+}
+
+/* Your friends, along the bottom. The one you are steering is lit up. */
+#party {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+#party span {
+  padding: 5px 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgba(20, 40, 40, 0.78);
+  font-size: 8px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+
+#party span.on {
+  border-color: #ffd76a;
+  background: rgba(200, 120, 20, 0.9);
+}
+
+#party span.gone {
+  opacity: 0.45;
+}
+
+#party i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+}
+
+#party small {
+  display: block;
+  font-size: 6px;
+  color: #d8e8d8;
+}
+
+#toast,
+#hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 1.7;
+  max-width: 66%;
+  pointer-events: none;
+}
+
+#toast {
+  top: 46px;
+  background: rgba(255, 251, 232, 0.95);
+  color: #3a3a2a;
+}
+
+#hint {
+  bottom: 58px;
+  background: rgba(20, 40, 40, 0.8);
+  color: #ffe9a8;
+}
+
+#toast[hidden],
+#hint[hidden] {
+  display: none;
+}
+
+/* ----- Somebody talking: a cream speech box along the bottom ----- */
+#talk {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 18px;
+  padding: 20px 22px 14px;
+  border: 4px solid #ffb84a;
+  border-radius: 22px;
+  background: #fffbe8;
+  color: #4a3a2a;
+  text-align: left;
+  cursor: pointer;
+}
+
+#talk[hidden] {
+  display: none;
+}
+
+#talk-who {
+  position: absolute;
+  left: 22px;
+  top: -16px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: #e8801a;
+  color: #fff;
+  font-size: 9px;
+}
+
+#talk-who[hidden] {
+  display: none;
+}
+
+#talk-text {
+  margin: 0 0 4px;
+  font-size: 10px;
+  line-height: 2;
+}
+
+#talk .next {
+  float: right;
+  color: #e8801a;
+  font-size: 9px;
+  animation: bob 0.8s infinite;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+/* ----- Buttons and pop-ups ----- */
+button {
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  margin: 4px;
+  border: 2px solid #ffd76a;
+  border-radius: 10px;
+  background: #3f6a5a;
+  color: #fffbe8;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #4f8a6a;
+}
+
+button.big {
+  font-size: 12px;
+  padding: 10px 18px;
+  background: #e8801a;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 40, 44, 0.92);
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 9px;
+  line-height: 1.9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay p {
+  max-width: 720px;
+  margin: 6px auto;
+}
+
+.logo {
+  font-size: 24px;
+  color: #ffb84a;
+  text-shadow: 3px 3px 0 #5a2a0a;
+}
+
+.keys {
+  font-size: 8px;
+  color: #c8dcd0;
+}
