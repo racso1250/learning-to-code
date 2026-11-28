@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fossil Bay: Wild Again</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+    <link rel="stylesheet" href="style.css?v=1">
+    <!-- game.js adds a picture of each creature in here, the first time it is needed -->
+    <style id="pics"></style>
+  </head>
+  <body>
+    <h1>Fossil Bay: Wild Again</h1>
+    <p id="goal">The park closed years ago. Now the island belongs to the dinosaurs</p>
+    <div class="screen">
+      <canvas id="game"></canvas>
+      <div id="tint"></div>
+      <div id="splat"></div>
+
+      <!-- Everything you see while you play -->
+      <div id="hud" hidden>
+        <div id="meters">
+          <div class="bar"><div id="health-fill"></div></div><span>Health</span>
+          <div class="bar"><div id="run-fill"></div></div><span id="run-label">Run</span>
+        </div>
+        <p id="place"></p>
+        <div id="tally"></div>
+        <p id="keys-line"></p>
+        <canvas id="map" width="160" height="144"></canvas>
+        <div id="crosshair">+</div>
+        <!-- The scanner: what it is pointing at, and a bar that fills as it scans -->
+        <div id="scan" hidden>
+          <span id="scan-label"></span>
+          <div class="bar" id="scan-bar"><div id="scan-fill"></div></div>
+        </div>
+        <p id="hint" hidden></p>
+      </div>
+      <p id="toast" hidden></p>
+
+      <!-- Your field guide -->
+      <div id="guide" class="overlay" hidden>
+        <div id="guide-top">
+          <h2>Field guide</h2>
+          <span id="guide-count"></span>
+          <button id="guide-close">Close (B)</button>
+        </div>
+        <div id="guide-list"></div>
+      </div>
+
+      <div id="card" class="overlay" hidden>
+        <p id="card-text"></p>
+        <p class="next">Press Space</p>
+      </div>
+
+      <div id="won" class="overlay" hidden>
+        <h2 class="logo">Expedition complete!</h2>
+        <p id="won-text"></p>
+        <button id="won-close">Keep exploring</button>
+      </div>
+
+      <div id="intro" class="overlay">
+        <h2 class="logo">Fossil Bay: Wild Again</h2>
+        <p>Fossil Bay was once a dinosaur park. It closed years ago, and nobody has been back since. Now you are leading an expedition to find out what lives there. Take your boat to the island, scan every kind of creature you can find, and bring back the three lost data drives of the old park. They say the park's lab made things it never told anyone about...</p>
+        <p class="keys">W, A, S, D: walk, or steer the boat &nbsp; Mouse or arrow keys: look &nbsp; Shift: run &nbsp; C: sneak and duck<br>E: get in and out of the boat, climb, open, take &nbsp; Hold Space (or the mouse button): scan<br>G: throw a flare &nbsp; Q: use a medkit &nbsp; B: field guide</p>
+        <button id="continue" hidden>Continue</button>
+        <button id="start">New expedition</button>
+      </div>
+    </div>
+    <p class="help">Nothing can reach you at the top of a watchtower, and they are good places to scan from. Meat-eaters can't resist going to look at a burning flare. The T. rex can't see you if you stand perfectly still. Land animals won't follow you into deep water, but something else lives out there, and it turns slowly: keep your speed up and steer hard. The blue beams of light mark the data drives. If the game runs slowly, add ?plain to the end of the address to switch the shadows off.</p>
+    <p><a href="../index.html">Back to the arcade</a></p>
+
+    <!-- Three.js: a library for 3D graphics (needs the internet to load) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../sounds.js"></script>
+    <script src="data.js?v=1"></script>
+    <script src="scene.js?v=1"></script>
+    <script src="dinos.js?v=1"></script>
+    <script src="game.js?v=1"></script>
+    <script src="../fullscreen.js"></script>
+  </body>
+</html>

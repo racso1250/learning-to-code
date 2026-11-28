@@ -1,0 +1,429 @@
+/* Fossil Bay: Wild Again. Storm blue, rust and warning yellow */
+
+body {
+  background: linear-gradient(#2a4a5a, #101c24);
+  min-height: 100vh;
+  margin: 0;
+  padding: 24px 16px;
+  color: #f4fbea;
+  font-family: "Press Start 2P", monospace;
+  text-align: center;
+}
+
+h1 {
+  font-size: 24px;
+  margin: 0 0 12px;
+  color: #ffd76a;
+  text-shadow: 3px 3px 0 #4a3018, 0 0 18px rgba(255, 215, 106, 0.5);
+}
+
+h2 {
+  font-size: 12px;
+  color: #ffd76a;
+  margin: 0 0 10px;
+}
+
+h3 {
+  font-size: 8px;
+  color: #b8f0a0;
+  margin: 10px 0 4px;
+}
+
+a {
+  color: #b8f0a0;
+  font-size: 10px;
+}
+
+#goal {
+  max-width: 960px;
+  margin: 0 auto 8px;
+  font-size: 9px;
+  line-height: 1.6;
+  color: #b8f0a0;
+}
+
+.help {
+  max-width: 900px;
+  margin: 12px auto;
+  font-size: 8px;
+  line-height: 1.8;
+  color: #a8c8a0;
+}
+
+/* The game sits in a frame, and everything else is laid on top of it */
+.screen {
+  position: relative;
+  max-width: 960px;
+  margin: 0 auto;
+  border: 4px solid #a8623a;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #03080f;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+}
+
+/* A red flash round the edge when you are hurt, and green spit in your eyes */
+#tint,
+#splat {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#tint {
+  transition: box-shadow 0.25s;
+}
+
+#splat {
+  opacity: 0;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(130, 220, 40, 0.95) 0 16%, transparent 24%),
+    radial-gradient(circle at 62% 30%, rgba(110, 200, 30, 0.95) 0 12%, transparent 20%),
+    radial-gradient(circle at 55% 66%, rgba(140, 230, 50, 0.95) 0 20%, transparent 28%),
+    radial-gradient(circle at 80% 60%, rgba(120, 210, 40, 0.9) 0 9%, transparent 16%);
+}
+
+/* ----- The bars and labels on top of the game ----- */
+#hud[hidden] {
+  display: none;
+}
+
+#meters {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  display: grid;
+  grid-template-columns: 130px auto;
+  gap: 5px 8px;
+  align-items: center;
+  font-size: 8px;
+  text-align: left;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.bar {
+  height: 11px;
+  border: 2px solid #f4fbea;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.bar div {
+  height: 100%;
+}
+
+#health-fill { background: #ff6a5a; }
+#run-fill { background: #8ff3ff; }
+
+#place,
+#keys-line,
+#tally {
+  position: absolute;
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.8;
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+#place {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #ffd76a;
+  white-space: nowrap;
+}
+
+#tally {
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+#tally span {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+#keys-line {
+  left: 10px;
+  bottom: 10px;
+  text-align: left;
+  color: #d8e8c8;
+}
+
+#map {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 176px;
+  height: 158px;
+  border: 2px solid #f4fbea;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 1px 1px 0 #000;
+  pointer-events: none;
+}
+
+#toast,
+#hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 9px;
+  line-height: 1.7;
+  max-width: 62%;
+  pointer-events: none;
+}
+
+#toast {
+  top: 62px;
+  background: rgba(10, 26, 14, 0.88);
+  border: 2px solid #b8f0a0;
+}
+
+#hint {
+  bottom: 46px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffd76a;
+}
+
+#toast[hidden],
+#hint[hidden] {
+  display: none;
+}
+
+/* ----- Buttons ----- */
+button {
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  margin: 4px;
+  border: 2px solid #b8f0a0;
+  border-radius: 6px;
+  background: #1d4a2a;
+  color: #f4fbea;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #2f6a3c;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.on {
+  background: #c8901a;
+  border-color: #ffe14a;
+  color: #fff;
+}
+
+button.big {
+  border-color: #ffd76a;
+  color: #ffd76a;
+}
+
+button b {
+  color: #ffd76a;
+  font-weight: normal;
+}
+
+.need {
+  color: #ff9d8a;
+}
+
+.got {
+  color: #8dffb0;
+}
+
+/* ----- Pop-ups ----- */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 16, 8, 0.9);
+  padding: 20px;
+  overflow-y: auto;
+  font-size: 9px;
+  line-height: 1.9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.overlay p {
+  max-width: 700px;
+  margin: 6px auto;
+}
+
+.overlay input {
+  width: 260px;
+  margin: 10px 0;
+  text-align: center;
+}
+
+.logo {
+  font-size: 22px;
+  color: #ffd76a;
+  text-shadow: 3px 3px 0 #4a3018, 0 0 18px rgba(255, 215, 106, 0.6);
+}
+
+.keys {
+  color: #a8c8a0;
+  font-size: 8px;
+}
+
+.next {
+  color: #ffd76a;
+}
+
+#card-text {
+  font-size: 10px;
+  line-height: 2;
+  white-space: pre-line;
+}
+
+/* ----- The scanner: a label and a bar, just under the middle of the screen ----- */
+#scan {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 260px;
+  transform: translateX(-50%);
+  font-size: 8px;
+  line-height: 1.8;
+  text-shadow: 1px 1px 0 #000;
+  color: #7dff8a;
+  pointer-events: none;
+}
+
+#scan[hidden] {
+  display: none;
+}
+
+#scan-fill {
+  width: 0;
+  background: #7dff8a;
+}
+
+/* ----- The field guide ----- */
+#guide {
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 12px 16px;
+}
+
+#guide-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+#guide-top h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+#guide-count {
+  flex: 1;
+  color: #8dffb0;
+}
+
+#guide-list {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  align-content: start;
+  margin-top: 6px;
+}
+
+#guide-list h3 {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  font-size: 9px;
+  color: #ff9d8a;
+  text-align: left;
+}
+
+.page {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border: 2px solid #5a8a9a;
+  border-radius: 6px;
+  background: #0d2430;
+  font-size: 7px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.page b {
+  color: #ffd76a;
+  font-weight: normal;
+  font-size: 8px;
+}
+
+.page.hybrid {
+  border-color: #ff7a5a;
+}
+
+.page.unknown {
+  border-style: dashed;
+  color: #6a8a9a;
+}
+
+/* A little picture of a creature. (game.js makes a ".pic-rex" rule for each kind.) */
+.pic {
+  flex: none;
+  width: 84px;
+  height: 63px;
+  border-radius: 4px;
+  background: #cfeaf4 center / cover no-repeat;
+  font-style: normal;
+}
+
+.page.unknown .pic {
+  background: #14323e;
+  font-size: 26px;
+  line-height: 63px;
+  text-align: center;
+  color: #3a6a7a;
+}
+
+#scan-bar[hidden] {
+  display: none;
+}
