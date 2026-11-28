@@ -110,14 +110,17 @@ function readyPark(s) {
   // ----- Fossil sites: four hidden in every region, for the jeep to find -----
   for (const biome in BIOMES) {
     let made = 0;
-    while (made < 4) {
+    let tries = 0;
+    while (made < 4 && tries++ < 3000) {
       const i = 6 + Math.floor(roll() * (SIZE - 12));
       const k = 6 + Math.floor(roll() * (SIZE - 12));
       if (biomeAt(i, k) !== biome) continue;
       if (i > 48 && i < 112 && k > 112) continue;      // not inside the park itself
       const x = mid(i);
       const z = mid(k);
-      if (s.sites.some(function (site) { return Math.hypot(site.x - x, site.z - z) < 70; })) continue;
+      // Sites should be well apart. (If a region is too small for that, they may be a bit closer.)
+      const apart = tries < 1500 ? 70 : 35;
+      if (s.sites.some(function (site) { return Math.hypot(site.x - x, site.z - z) < apart; })) continue;
       s.sites.push({ x: x, z: z, biome: biome, found: false });
       made++;
     }

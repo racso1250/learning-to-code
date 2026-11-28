@@ -111,6 +111,12 @@ function updateStaff(dt) {
         if (workerTo(w, prey.x, prey.z, 14, dt) < dartReach) dartHit(prey);
         continue;
       }
+      // Next: wild Pteranodons attacking the monorail
+      if (raiding()) {
+        const car = trainCars[0].position;
+        if (workerTo(w, car.x, car.z, 14, dt) < dartReach) endRaid("Your ranger fires a flare, and the Pteranodons scatter!");
+        continue;
+      }
       // Next: a fence that has been knocked about, and is not being bashed right now
       const hurt = state.pads.find(function (p) { return p.hp < padMax(p) - 0.5 && state.time - (p.hitAt || -9) > 4 && !p.breach; });
       if (hurt) {
@@ -195,7 +201,7 @@ function discover(kind, how) {
   state.known[kind] = true;
   state.fresh[kind] = true;
   sound(playJingle);
-  sayFound(kind, how + " That is " + knownCount() + " of 100 in your Dinodex.");
+  sayFound(kind, how + " That is " + knownCount() + " of " + TOTAL + " in your Dinodex.");
 }
 
 // Everything a camp or a lab could work on. "locked" says why you can't start it yet (or "" if you can).
@@ -345,7 +351,7 @@ function moveTrain(dt) {
     legs.push({ a: a, b: b, long: long });
     total += long;
   }
-  trainAt = (trainAt + dt * 22) % total;
+  if (!raiding()) trainAt = (trainAt + dt * 22) % total;      // the driver stops while Pteranodons are attacking
   trainCars.forEach(function (car, n) {
     let far = ((trainAt - n * 7) % total + total) % total;
     let leg = legs[0];
@@ -358,5 +364,72 @@ function moveTrain(dt) {
     car.visible = true;
     car.position.set(leg.a.x + (leg.b.x - leg.a.x) * t, RAIL_HIGH + 1.4, leg.a.z + (leg.b.z - leg.a.z) * t);
     car.rotation.y = Math.atan2(-(leg.b.x - leg.a.x), -(leg.b.z - leg.a.z));
+  });
+}
+
+// ----- Wild Pteranodons -----
+// A flock of wild Pteranodons lives over the Ashlands, near the volcano. Every so often they
+// come down and mob the monorail train. It has to stop until somebody frightens them off.
+const flock = [];
+for (let n = 0; n < 4; n++) flock.push({ x: 0, y: 70, z: -HALF + 80, turn: n * 1.6, model: null });
+const ROOST = { x: 0, z: -HALF + 90 };
+
+function raiding() {
+  return state.time < state.raidUntil;
+}
+
+function endRaid(how) {
+  if (!raiding()) return;
+  state.raidUntil = 0;
+  state.nextRaid = state.time + 200 + Math.random() * 200;
+  soundCash();
+  say(how, 5);
+}
+
+function updateFlock(dt) {
+  // Time for a raid? (Only if there is a monorail to attack, and it has no horn to scare them.)
+  if (!raiding() && railStops.length > 1 && !state.tech.horn && state.time > state.nextRaid) {
+    state.raidUntil = state.time + 80;
+    soundRoar();
+    say("Wild Pteranodons are attacking the monorail! The train has stopped. Send a ranger, drive the jeep there, or pay for flares.", 8);
+  } else if (!raiding() && state.raidUntil && state.time > state.raidUntil) {
+    // They got bored and flew home by themselves
+    state.raidUntil = 0;
+    state.nextRaid = state.time + 200 + Math.random() * 200;
+  }
+  const mobbing = raiding();
+  if (mobbing) state.scare = Math.min(12, state.scare + dt * 0.15);     // the visitors don't like it one bit
+  const car = trainCars[0].position;
+  flock.forEach(function (bird, n) {
+    // Round and round: tight circles over the train, or wide lazy ones over the Ashlands
+    bird.turn += dt * (mobbing ? 1.6 : 0.25);
+    const wide = mobbing ? 6 + n * 2 : 40 + n * 12;
+    const tx = (mobbing ? car.x : ROOST.x) + Math.cos(bird.turn) * wide;
+    const tz = (mobbing ? car.z : ROOST.z) + Math.sin(bird.turn) * wide;
+    const ty = mobbing ? RAIL_HIGH + 4 + Math.sin(bird.turn * 2 + n) * 2.5 : 60 + n * 7;
+    const dx = tx - bird.x;
+    const dy = ty - bird.y;
+    const dz = tz - bird.z;
+    const far = Math.hypot(dx, dy, dz);
+    const step = Math.min(far, 45 * dt);
+    if (far > 0.01) {
+      bird.x += dx / far * step;
+      bird.y += dy / far * step;
+      bird.z += dz / far * step;
+      bird.yaw = Math.atan2(-dx, -dz);
+    }
+  });
+}
+
+function drawFlock(t) {
+  flock.forEach(function (bird, n) {
+    if (!bird.model) {
+      bird.model = makeDino("ptera");
+      bird.model.group.rotation.order = "YXZ";
+      scene.add(bird.model.group);
+    }
+    bird.model.group.position.set(bird.x, bird.y, bird.z);
+    bird.model.group.rotation.set(0, bird.yaw || 0, Math.sin(t * 2 + n) * 0.2);
+    for (const wing of bird.model.wings) wing.group.rotation.z = wing.side * Math.sin(t * 6 + n) * 0.5;
   });
 }

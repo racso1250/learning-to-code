@@ -1,6 +1,7 @@
 // Dino Island 100: the rule book.
-// No drawing in here. This file says how big the island is, where its seven regions are,
-// and lists all 100 dinosaurs: 80 that you can discover, and 20 hybrids you can make in a lab.
+// No drawing in here. This file says how big the island is, where its eight regions are,
+// and lists every creature: 102 that you can discover (dinosaurs, sea reptiles and flying reptiles),
+// and 22 hybrids you can make in a lab.
 
 const TILE = 4;                    // the island is a grid of squares, each 4 metres wide
 const SIZE = 160;                  // 160 squares across and 160 deep: four times the size of Fossil Bay
@@ -43,21 +44,26 @@ const BIOMES = {
   swamp:  { name: "Misty Swamp",      ground: 0x4a7a5a, other: 0x5e8c60, map: "#3f6f4f" },
   ash:    { name: "Ashlands",         ground: 0x5a504c, other: 0x74645a, map: "#5a504c" },
   coast:  { name: "Coral Coast",      ground: 0xe8d8a0, other: 0xd8e0a8, map: "#e8d8a0" },
+  mangrove: { name: "The Mangroves",  ground: 0x4a8a72, other: 0x6a9a5a, map: "#3f8a72" },
 };
 
 // Which region is this square in? The plains (where your park is) fill the south and middle.
+// The borders wobble from side to side, so the regions run into each other like real countryside.
 function biomeAt(i, k) {
-  if (k < 44) return i < 54 ? "snow" : i < 108 ? "ash" : "desert";     // the far north
-  if (i < 42) return k < 104 ? "forest" : "swamp";                     // the west
-  if (i >= 120) return "coast";                                        // the east
+  const wi = i + 5 * Math.sin(k * 0.13) + 3 * Math.sin(k * 0.31 + 1);
+  const wk = k + 5 * Math.sin(i * 0.11 + 2) + 3 * Math.sin(i * 0.29);
+  if (wk < 44) return wi < 54 ? "snow" : wi < 108 ? "ash" : "desert";      // the far north
+  if (wi < 42) return wk < 104 ? "forest" : "swamp";                       // the west
+  if (wi >= 120) return wk < 108 ? "coast" : "mangrove";                   // the east
   return "meadow";
 }
 
-// ----- The 80 dinosaurs you can discover -----
+// ----- The dinosaurs you can discover -----
 // Each row: id, name, body plan, length in metres, what it eats, its region, its tier (0 = common ... 5 = legendary),
 // three colours (body, belly, trim), and its special features.
 // Body plans: T = big meat-eater on two legs, R = raptor, O = ostrich-like runner, H = duckbill,
-//             P = dome-head, S = long-neck, C = horned face, G = plated back, A = armoured tank.
+//             P = dome-head, S = long-neck, C = horned face, G = plated back, A = armoured tank,
+//             M = sea reptile (it lives in a lagoon), W = flying reptile (it lives in an aviary).
 const ROWS = [
   ["para", "Parasaurolophus", "H", 9, "plants", "meadow", 0, 0xd98a3a, 0xf0d8a0, 0xc8402a, "tube"],
   ["tri", "Triceratops", "C", 8, "plants", "meadow", 0, 0x8a9a6a, 0xd8d0a8, 0xf4ecd8, "frill horns3"],
@@ -113,9 +119,9 @@ const ROWS = [
   ["compy", "Compsognathus", "R", 1.2, "meat", "swamp", 0, 0x6a9a4a, 0xd8e8b0, 0x3a5a2a, ""],
   ["polac", "Polacanthus", "A", 5, "plants", "swamp", 1, 0x6a7a4a, 0xd0d8a8, 0xf4ecd8, "armour backspikes"],
   ["tenon", "Tenontosaurus", "H", 7, "plants", "swamp", 1, 0x7a8a5a, 0xd8e0b8, 0x4a5a3a, ""],
-  ["bary", "Baryonyx", "T", 9.5, "fish", "swamp", 2, 0x5a7a4a, 0xc8d8a0, 0x3a5a2a, "snout"],
+  ["bary", "Baryonyx", "T", 9.5, "fish", "mangrove", 2, 0x5a7a4a, 0xc8d8a0, 0x3a5a2a, "snout"],
   ["ourano", "Ouranosaurus", "H", 8, "plants", "swamp", 2, 0x8a9a4a, 0xe0e0b0, 0xe8823a, "sail"],
-  ["irrit", "Irritator", "T", 7.5, "fish", "swamp", 2, 0x4a6a6a, 0xc0d8d0, 0xd8a03a, "snout crest1"],
+  ["irrit", "Irritator", "T", 7.5, "fish", "mangrove", 2, 0x4a6a6a, 0xc0d8d0, 0xd8a03a, "snout crest1"],
   ["diplo", "Diplodocus", "S", 26, "plants", "swamp", 3, 0xb89a6a, 0xe0d0a8, 0x8a6a4a, "low whip"],
   ["sucho", "Suchomimus", "T", 11, "fish", "swamp", 3, 0x6a8a6a, 0xd0e0c0, 0x4a9a7a, "snout ridge"],
   ["apato", "Apatosaurus", "S", 22, "plants", "swamp", 3, 0x8a8a7a, 0xd0d0c0, 0x5a5a4a, "low"],
@@ -145,6 +151,32 @@ const ROWS = [
   ["gigantor", "Gigantoraptor", "R", 8, "plants", "coast", 3, 0xc88a3a, 0xf0e0c0, 0xd8442e, "crest1 feathers"],
   ["mamen", "Mamenchisaurus", "S", 24, "plants", "coast", 3, 0x6a9a8a, 0xd0e8e0, 0x3a6a5a, "tall longneck"],
   ["argent", "Argentinosaurus", "S", 34, "plants", "coast", 5, 0x9a8a70, 0xe0d8c0, 0x6a5a40, "low"],
+  ["concav", "Concavenator", "T", 6, "meat", "desert", 2, 0x8a6a3a, 0xe0d0a0, 0xd8442e, "hump"],
+  ["zuni", "Zuniceratops", "C", 3.5, "plants", "desert", 1, 0xb8904a, 0xe8dcb0, 0xf4ecd8, "frill browhornsbig"],
+  ["lurdu", "Lurdusaurus", "H", 9, "plants", "mangrove", 1, 0x5a7a6a, 0xd0e0d0, 0x3a5a4a, "thumbs"],
+  ["ichthyov", "Ichthyovenator", "T", 9, "fish", "mangrove", 2, 0x3a6a5a, 0xc8e0d0, 0xffb02a, "snout sail"],
+  ["oxal", "Oxalaia", "T", 13, "fish", "mangrove", 4, 0x5a5a3a, 0xd8d8b0, 0x8a3a2a, "snout ridge"],
+
+  // Sea reptiles. They need a lagoon, and they eat fish. (For these, the length is nose to tail.)
+  ["ichthyo", "Ichthyosaurus", "M", 3, "fish", "coast", 0, 0x4a6a8a, 0xd8e4ec, 0x2a3a4a, "fin beak"],
+  ["plesio", "Plesiosaurus", "M", 4.5, "fish", "coast", 1, 0x4a8a8a, 0xd8ece4, 0x2a5a5a, "swanneck"],
+  ["notho", "Nothosaurus", "M", 4, "fish", "swamp", 1, 0x6a7a4a, 0xe0e4c0, 0x3a4a2a, "beak"],
+  ["elasmo", "Elasmosaurus", "M", 12, "fish", "snow", 2, 0x5a7a9a, 0xe0e8f0, 0x3a4a6a, "swanneck"],
+  ["lio", "Liopleurodon", "M", 7, "fish", "coast", 3, 0x2a3a5a, 0xe8e8e0, 0x1a2a3a, "bighead"],
+  ["krono", "Kronosaurus", "M", 10, "fish", "coast", 3, 0x5a4a3a, 0xe0d8c8, 0x3a2a1a, "bighead"],
+  ["tylo", "Tylosaurus", "M", 12, "fish", "snow", 3, 0x3a5a5a, 0xc8d8d0, 0xd8a03a, "ridge"],
+  ["mosa", "Mosasaurus", "M", 16, "fish", "coast", 4, 0x3a5a6a, 0xc8d8d8, 0x2a3a4a, "ridge"],
+  ["sarco", "Sarcosuchus", "M", 11, "fish", "mangrove", 3, 0x5a6a3a, 0xd8dcb0, 0x3a4a2a, "beak ridge"],
+
+  // Flying reptiles. They need an aviary, and they eat fish. (For these, the length is wing tip to wing tip.)
+  ["pterod", "Pterodactylus", "W", 1.4, "fish", "meadow", 0, 0xb89a6a, 0xf0e4c8, 0xd8a03a, ""],
+  ["dimor", "Dimorphodon", "W", 1.6, "fish", "forest", 0, 0x6a7a5a, 0xe0e4c8, 0xd8442e, "bighead"],
+  ["rhamph", "Rhamphorhynchus", "W", 1.9, "fish", "mangrove", 1, 0x5a5a6a, 0xd8d8e0, 0xe8823a, "tailvane"],
+  ["dsung", "Dsungaripterus", "W", 3.2, "fish", "desert", 1, 0xc88a4a, 0xf0e0c0, 0x4a3a2a, "crest"],
+  ["ptera", "Pteranodon", "W", 6.5, "fish", "coast", 1, 0xc8a070, 0xf0e0c0, 0xd8442e, "crest"],
+  ["tapej", "Tapejara", "W", 3.6, "fish", "forest", 2, 0x3a8a6a, 0xd8f0e0, 0xff5a8a, "sailcrest"],
+  ["tupan", "Tupandactylus", "W", 4.2, "fish", "ash", 2, 0x4a4a5a, 0xd8d8e4, 0xffb02a, "sailcrest crest"],
+  ["quetz", "Quetzalcoatlus", "W", 11, "fish", "desert", 4, 0xd8c8a0, 0xf4f0e0, 0x8a3a2a, "crest longneck"],
 ];
 
 // ----- The 20 hybrids -----
@@ -171,13 +203,19 @@ const MIXES = [
   ["h_icehorn", "Ice Horn", "pachyr", "cryo"],
   ["h_swampking", "Swamp King", "h_sailtyrant", "sucho"],
   ["h_emperor", "The Emperor", "h_hammerrex", "h_embertyrant"],
+  // Two super-hybrids with a look of their own: [ ..., features, three colours, length ]
+  // Needleback is small, fast and covered in spines. The Overlord is the biggest hunter of all:
+  // it is so strong that only a Titan Vault can hold it.
+  ["h_needle", "Needleback", "carno", "kentro", "browhorns spines backspikes sidespikes quills thagomizer stripes redeyes", 0x2a2630, 0x5a4a58, 0xff3a2a, 9],
+  ["h_overlord", "The Overlord", "giga", "theri", "longarms backspikes brows ridge stripes redeyes", 0xe8e4d8, 0xc8c0b0, 0xb8242a, 17],
 ];
 
-const PLAN_NAMES = { T: "thero", R: "raptor", O: "runner", H: "duckbill", P: "dome", S: "longneck", C: "horned", G: "plated", A: "tank" };
-const PLAN_SPEED = { T: 5, R: 6.5, O: 7, H: 3.2, P: 3.5, S: 1.8, C: 2.6, G: 2.2, A: 1.8 };
-const PLAN_TALL = { T: 0.5, R: 0.55, O: 0.7, H: 0.55, P: 0.6, S: 0.45, C: 0.45, G: 0.52, A: 0.36 };
+const PLAN_SPEED = { T: 5, R: 6.5, O: 7, H: 3.2, P: 3.5, S: 1.8, C: 2.6, G: 2.2, A: 1.8, M: 3.5, W: 6 };
+const PLAN_TALL = { T: 0.5, R: 0.55, O: 0.7, H: 0.55, P: 0.6, S: 0.45, C: 0.45, G: 0.52, A: 0.36, M: 0.2, W: 0.25 };
+// Every dinosaur is drawn this much bigger than life, so they look grand from high above
+const BIG = 1.3;
 
-// Build the full list of 100 from the two tables above. Every dinosaur gets:
+// Build the full list from the two tables above. Every dinosaur gets:
 //   name, diet, biome, tier, plan, size, colours, feats (its features),
 //   and numbers worked out from its size and tier: cost, appeal, need, herd, strength, speed.
 const SPECIES = {};
@@ -189,27 +227,40 @@ function addKind(id, name, plan, size, diet, biome, tier, a, b, c, feats, parent
   if (parents) appeal = Math.round(appeal * 1.4 + 4);
   const small = size < 5;
   SPECIES[id] = {
-    name: name, diet: diet, biome: biome, tier: tier, plan: plan, size: size, a: a, b: b, c: c, feats: feats, parents: parents || null, home: "land",
+    name: name, diet: diet, biome: biome, tier: tier, plan: plan, size: size, a: a, b: b, c: c, feats: feats, parents: parents || null,
+    home: plan === "M" ? "water" : plan === "W" ? "air" : "land",   // the kind of paddock it needs
     appeal: appeal,
     cost: Math.round((80 + appeal * 90) / 50) * 50,
     need: clamp(Math.round(size * 1.2), 4, 36),
-    herd: plan === "R" ? 2 : !meat && small ? 3 : !meat && size < 10 && plan !== "G" && plan !== "A" ? 2 : 1,
+    herd: plan === "R" || (plan === "W" && small) ? 2 : !meat && small ? 3 : !meat && size < 10 && plan !== "G" && plan !== "A" ? 2 : 1,
     strength: Math.min(12, Math.round(1 + size * 0.5 + (meat ? 2 : 0) + (parents ? 2 : 0))),
     speed: PLAN_SPEED[plan],
     stars: Math.min(5, tier),
   };
   const tall = feats.includes("tall") ? 0.75 : PLAN_TALL[plan];
-  SHAPES[id] = { tall: size * tall + (feats.includes("sail") ? size * 0.12 : 0), long: size };
+  SHAPES[id] = { tall: (size * tall + (feats.includes("sail") ? size * 0.12 : 0)) * BIG, long: size * BIG };
 }
 
 for (const row of ROWS) addKind(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10].split(" ").filter(Boolean));
 for (const mix of MIXES) {
   const one = SPECIES[mix[2]];
   const two = SPECIES[mix[3]];
-  // Body, size and home from the first parent; features from both; the trim colour from the second
-  const feats = Array.from(new Set(one.feats.concat(two.feats)));
-  addKind(mix[0], mix[1], one.plan, Math.round(Math.max(one.size, two.size * 0.7) * 1.1 * 10) / 10, one.diet, one.biome, Math.min(5, Math.max(one.tier, two.tier) + 1), one.a, two.a, two.c, feats, [mix[2], mix[3]]);
+  // Body, size and home from the first parent; features from both; the trim colour from the second.
+  // (Unless the row gives the hybrid features, colours and a size of its own.)
+  const feats = mix[4] ? mix[4].split(" ") : Array.from(new Set(one.feats.concat(two.feats)));
+  const size = mix[8] || Math.round(Math.max(one.size, two.size * 0.7) * 1.1 * 10) / 10;
+  addKind(mix[0], mix[1], one.plan, size, one.diet, one.biome, Math.min(5, Math.max(one.tier, two.tier) + 1), mix[5] || one.a, mix[6] || two.a, mix[7] || two.c, feats, [mix[2], mix[3]]);
 }
+// The Overlord smashes through any ordinary fence in moments. Needleback is nearly as bad.
+SPECIES.h_overlord.strength = 40;
+SPECIES.h_overlord.vault = true;
+SPECIES.h_overlord.appeal = 60;
+SPECIES.h_overlord.cost = 6000;
+SPECIES.h_needle.pit = true;
+SPECIES.h_needle.strength = 16;
+SPECIES.h_needle.speed = 7;
+SPECIES.h_needle.appeal = 40;
+const TOTAL = Object.keys(SPECIES).length;      // how many creatures there are to find
 
 // The kinds the park already has when you take over
 const STARTERS = ["para", "tri", "galli", "steg", "raptor", "rex"];
@@ -220,13 +271,27 @@ const FENCES = {
   steel:    { name: "Steel fence",    hp: 160, per: 20, high: 3.2 },
   electric: { name: "Electric fence", hp: 400, per: 45, high: 4 },
 };
-const PADS = { land: { name: "Paddock", per: 8 } };
+// The kinds of home a creature can have. "per" is the cost of each square's length of wall.
+// "side" is for the two special ones, which always come the same size.
+const PADS = {
+  land:  { name: "Paddock", per: 8 },
+  water: { name: "Lagoon", per: 14, hp: 99999 },
+  air:   { name: "Aviary", per: 22, hp: 240 },
+  den:   { name: "Raptor den", per: 40, hp: 700, side: 8 },
+  vault: { name: "Titan Vault", per: 150, hp: 6000, side: 11 },
+  pit:   { name: "Needle Pit", per: 90, hp: 2500, side: 9 },
+};
 
 // ----- Things you can build -----
 const TOOLS = {
   look:     { name: "Look",            group: "all",   what: "Click a paddock, a lab or a camp to see what is going on in it" },
   remove:   { name: "Bulldozer",       group: "all",   what: "Click something to take it away. You get half its money back" },
-  paddock:  { name: "Paddock",         group: "dinos", pad: "land", what: "Hold the mouse button and drag a box. A fence goes round it" },
+  paddock:  { name: "Paddock",         group: "homes", pad: "land", what: "Hold the mouse button and drag a box. A fence goes round it" },
+  lagoon:   { name: "Lagoon",          group: "homes", pad: "water", what: "A pool for sea reptiles. Drag a box. They can never climb out" },
+  aviary:   { name: "Aviary",          group: "homes", pad: "air", what: "A net dome for flying reptiles. Drag a box" },
+  den:      { name: "Raptor den",      group: "homes", pad: "den", what: "A rocky cave behind high walls, 8 squares each way. Raptors love it, and so do visitors. Click to build" },
+  pit:      { name: "Needle Pit",      group: "homes", pad: "pit", stars: 2, what: "A cage with a roof of steel, 9 squares each way. Needleback climbs over any fence, so this is the only thing that can hold it. Click to build" },
+  vault:    { name: "Titan Vault",     group: "homes", pad: "vault", stars: 3, what: "A giant fortress, 11 squares each way, with huge doors you open and close. The only thing that can hold the Overlord. Click to build" },
   plants:   { name: "Plant feeder",    group: "dinos", cost: 100, inside: true, what: "Food for plant-eaters. Goes inside a paddock" },
   meat:     { name: "Meat feeder",     group: "dinos", cost: 150, inside: true, what: "Food for meat-eaters. Goes inside a paddock" },
   fish:     { name: "Fish feeder",     group: "dinos", cost: 150, inside: true, what: "Food for fish-eaters. Goes inside a paddock" },
@@ -236,6 +301,7 @@ const TOOLS = {
   snack:    { name: "Snack stall",     group: "guests", cost: 300,  walk: true, what: "Hungry visitors spend money here" },
   gift:     { name: "Gift shop",       group: "guests", cost: 600,  walk: true, what: "Visitors buy toy dinosaurs here" },
   diner:    { name: "Restaurant",      group: "guests", cost: 900,  walk: true, stars: 3, what: "Visitors spend a lot here" },
+  museum:   { name: "Museum",          group: "guests", cost: 1500, walk: true, what: "Shows a fossil of every creature in your Dinodex. The more you have discovered, the more visitors pay" },
   camp:     { name: "Expedition camp", group: "park",   cost: 800,  what: "Sends teams out across the island to discover new dinosaurs" },
   lab:      { name: "Research lab",    group: "park",   cost: 1200, what: "Makes hybrid dinosaurs from two kinds you know, and invents things for the park" },
   tree:     { name: "Tree",            group: "pretty", cost: 20,  pretty: 0.2, what: "Makes the park prettier" },
@@ -245,7 +311,7 @@ const TOOLS = {
   fountain: { name: "Fountain",        group: "pretty", cost: 250, pretty: 1.5, what: "Sparkling water. Visitors love it" },
   statue:   { name: "Dinosaur statue", group: "pretty", cost: 400, pretty: 2,   what: "A proud golden T. rex on a stone block" },
 };
-const GROUPS = { dinos: "Dinosaurs", guests: "Visitors", park: "Science", pretty: "Pretty things" };
+const GROUPS = { homes: "Homes", dinos: "Feeders", guests: "Visitors", park: "Science", pretty: "Pretty things" };
 
 // ----- People you can hire -----
 const STAFF = {
@@ -260,6 +326,7 @@ const TECH = {
   hatch:   { name: "Warm hatchery",     cost: 600,  time: 30, stars: 1, what: "Babies grow up twice as fast" },
   darts:   { name: "Long-range darts",  cost: 700,  time: 35, stars: 2, what: "The jeep and your rangers can dart from twice as far away" },
   shelter: { name: "Storm shelters",    cost: 1000, time: 45, stars: 2, what: "Dinosaurs are not frightened by storms any more" },
+  horn:    { name: "Monorail horn",     cost: 900,  time: 40, stars: 2, what: "A horn so loud that wild Pteranodons leave the monorail alone" },
 };
 
 // How many rating points you need for 1, 2, 3, 4 and 5 stars
@@ -274,6 +341,7 @@ const TRIPS = {
   forest: { cost: 400, time: 32 },
   swamp:  { cost: 400, time: 32 },
   coast:  { cost: 400, time: 32 },
+  mangrove: { cost: 400, time: 32 },
   desert: { cost: 550, time: 40 },
   ash:    { cost: 550, time: 40 },
   snow:   { cost: 550, time: 40 },
@@ -283,7 +351,7 @@ const TRIPS = {
 const GOALS = [
   { text: "A Velociraptor is loose near the gate! Press J for the jeep, drive close, and press Space to dart it", reward: 400 },
   { text: "The Tyrannosaurus fence is nearly broken. Choose Look, click its paddock, and mend the fence", reward: 300 },
-  { text: "The Triceratops are hungry. Put a Plant feeder in their paddock (Dinosaurs tab)", reward: 300 },
+  { text: "The Triceratops are hungry. Put a Plant feeder in their paddock (Feeders tab)", reward: 300 },
   { text: "Press Staff and hire a ranger, so somebody is ready next time", reward: 300 },
   { text: "Click the Expedition camp with Look and send a team out to discover a new dinosaur", reward: 400 },
   { text: "Hatch a kind of dinosaur that the park did not have when you took over", reward: 500 },
@@ -292,5 +360,7 @@ const GOALS = [
   { text: "Make your park a 3 star park", reward: 1500 },
   { text: "Discover 40 kinds of dinosaur", reward: 3000 },
   { text: "Make your park a 5 star park", reward: 5000 },
-  { text: "Discover all 100 dinosaurs!", reward: 0 },
+  { text: "Build a Lagoon and an Aviary (Homes tab), and hatch a sea reptile and a flying reptile", reward: 3000 },
+  { text: "Build a Titan Vault, and hatch the Overlord inside it. (A lab makes it from Giganotosaurus and Therizinosaurus)", reward: 5000 },
+  { text: "Discover every creature there is!", reward: 0 },
 ];

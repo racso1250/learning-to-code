@@ -1,5 +1,5 @@
 // Dino Island 100: the park.
-// The grid of squares, paddocks, paths and buildings, the monorail,
+// The grid of squares, paddocks (and lagoons, aviaries, dens and vaults), paths and buildings, the monorail,
 // the visitors who walk and ride around, and how many stars the park has earned.
 
 const parkGroup = new THREE.Group();   // everything you have built
@@ -47,14 +47,21 @@ function fenceLength(p) {
   return 2 * (p.i1 - p.i0 + 1 + p.k1 - p.k0 + 1);
 }
 
-// What one square's length of this paddock's fence costs
+// What one square's length of this paddock's wall costs
 function wallCost(p) {
-  return FENCES[p.fence].per;
+  return p.kind === "land" ? FENCES[p.fence].per : PADS[p.kind].per;
 }
 
-// How much bashing this paddock's fence can take when it is new
+// How vault doors and visitors change what a paddock's dinosaurs are worth.
+// Visitors love a raptor den. A vault is only a real show while its doors are open.
+function padShow(p) {
+  return p.kind === "den" ? 1.4 : p.kind === "pit" ? 1.3 : p.kind === "vault" ? (p.open ? 1.5 : 0.4) : 1;
+}
+
+// How much bashing this paddock's wall can take when it is new
 function padMax(p) {
-  return state.tech.fence ? FENCES[p.fence].hp * 1.5 : FENCES[p.fence].hp;
+  const hp = p.kind === "land" ? FENCES[p.fence].hp : PADS[p.kind].hp;
+  return state.tech.fence ? hp * 1.5 : hp;
 }
 
 function walkable(i, k) {
@@ -99,12 +106,16 @@ function whyNoPad(i0, k0, i1, k1, kind) {
   const wide = i1 - i0 + 1;
   const deep = k1 - k0 + 1;
   if (!inPark(i0, k0) || !inPark(i1, k1)) return "That is off the edge of the island";
-  if (wide < 3 || deep < 3) return "Make it at least 3 squares each way";
-  if (wide > 20 || deep > 20) return "That is too big (20 squares at most)";
+  const needs = TOOLS[kind === "land" ? "paddock" : kind === "water" ? "lagoon" : kind === "air" ? "aviary" : kind].stars;
+  if (needs > state.best) return "You need a " + needs + " star park for that";
+  if (!PADS[kind].side) {
+    if (wide < 3 || deep < 3) return "Make it at least 3 squares each way";
+    if (wide > 20 || deep > 20) return "That is too big (20 squares at most)";
+  }
   const biome = biomeAt(i0, k0);
   for (let i = i0; i <= i1; i++) {
     for (let k = k0; k <= k1; k++) {
-      if (biomeAt(i, k) !== biome) return "A paddock has to be all in one region";
+      if (biomeAt(i, k) !== biome) return "It has to be all in one region";
       if (typeAt(i, k)) return "Something is in the way";
       if (padAt(i, k)) return "Another paddock is in the way";
     }
@@ -118,7 +129,7 @@ function buildPad(i0, k0, i1, k1, kind) {
   kind = kind || "land";
   const why = whyNoPad(i0, k0, i1, k1, kind);
   if (why) return why;
-  const pad = { id: state.nextId++, i0: i0, k0: k0, i1: i1, k1: k1, kind: kind, fence: "wood", hp: 0, breach: null };
+  const pad = { id: state.nextId++, i0: i0, k0: k0, i1: i1, k1: k1, kind: kind, fence: "wood", hp: 0, breach: null, open: false };
   pad.hp = padMax(pad);
   state.money -= fenceLength(pad) * wallCost(pad);
   state.pads.push(pad);
@@ -199,6 +210,18 @@ function makeBuilding(type) {
     piece(g, new THREE.SphereGeometry(0.6, 8, 4, 0, Math.PI * 2, 0, Math.PI / 2.5), paint(0xd8e0e8), 0.6, 4.9, 0).rotation.x = Math.PI + 0.5;
     // A model of a DNA twist beside the door
     for (let n = 0; n < 7; n++) ball(g, paint(n % 2 ? 0x7dff8a : 0xff7ab8), 0.14, 0.14, 0.14, -1.5 + Math.cos(n * 0.9) * 0.3, 0.4 + n * 0.3, 1.5 + Math.sin(n * 0.9) * 0.3);
+  } else if (type === "museum") {
+    // A grand stone hall with columns, steps, a roof like a temple, and a skull on show outside
+    piece(g, new THREE.BoxGeometry(3.6, 2.6, 2.8), paint(0xe8e0d0), 0, 1.5, -0.3);
+    piece(g, new THREE.BoxGeometry(3.9, 0.3, 3.6), stone, 0, 0.15, 0);
+    for (const x of [-1.5, -0.5, 0.5, 1.5]) piece(g, new THREE.CylinderGeometry(0.16, 0.18, 2.5, 8), paint(0xf4f0e8), x, 1.5, 1.35);
+    const roof = piece(g, new THREE.CylinderGeometry(0.01, 2.2, 1.1, 3), paint(0x8a5a3a), 0, 3.35, 0.2);
+    roof.rotation.set(Math.PI / 2, 0, Math.PI);
+    roof.scale.set(1, 1.7, 1);
+    piece(g, new THREE.BoxGeometry(3.9, 0.25, 3.5), paint(0xf4f0e8), 0, 2.85, 0.1);
+    piece(g, new THREE.BoxGeometry(0.9, 1.6, 0.1), paint(0x4a3018), 0, 1.1, 1.12);
+    ball(g, paint(0xf0e8d0), 0.3, 0.22, 0.42, 1.5, 0.6, 1.75);
+    piece(g, new THREE.BoxGeometry(0.5, 0.3, 0.5), stone, 1.5, 0.3, 1.75);
   } else if (type === "camp") {
     // A big tent, a flag, a stack of crates, and a landing pad for the expedition helicopter
     const canvasPaint = paint(0xd8c890);
@@ -251,18 +274,127 @@ const FENCE_LOOKS = {
   electric: { post: 0x2a2a30, rail: 0xffe14a, rails: [0.7, 1.5, 2.3, 3.1, 3.8] },
 };
 
-// Build the fence round a paddock
+// What the walls of the special homes look like
+const WALL_LOOKS = {
+  air: { post: 0xb8b8b0, rail: 0xd8e0e8, rails: [0.8, 1.7, 2.6, 3.5], high: 4.2 },
+  den: { post: 0x6a6a70, rail: 0x3a3a44, rails: [0.6, 1.3, 2, 2.7, 3.4, 4.1, 4.8], high: 5.4 },
+  pit: { post: 0x2a2630, rail: 0x9a1a1a, rails: [0.6, 1.4, 2.2, 3, 3.8, 4.6, 5.4, 6.2], high: 6.8 },
+};
+
+// A lagoon: blue water with a low stone edge
+function makeLagoon(p, g, x0, z0, wide, deep) {
+  const middle = padMid(p);
+  const stone = paint(0xb8b8b0);
+  g.userData.postPaint = stone;
+  piece(g, new THREE.BoxGeometry(wide * TILE - 0.6, 0.5, deep * TILE - 0.6), new THREE.MeshPhongMaterial({ color: 0x2f8ac8, transparent: true, opacity: 0.8, shininess: 140 }), middle.x, 0.1, middle.z);
+  piece(g, new THREE.BoxGeometry(wide * TILE - 0.6, 0.1, deep * TILE - 0.6), paint(0x1f5a8a), middle.x, 0.02, middle.z);
+  for (const s of [-1, 1]) {
+    piece(g, new THREE.BoxGeometry(wide * TILE + 0.7, 0.9, 0.7), stone, middle.x, 0.45, middle.z + s * deep * TILE / 2).castShadow = true;
+    piece(g, new THREE.BoxGeometry(0.7, 0.9, deep * TILE + 0.7), stone, middle.x + s * wide * TILE / 2, 0.45, middle.z).castShadow = true;
+  }
+  return g;
+}
+
+// A Titan Vault: towering concrete walls, a tower on every corner, and two giant doors on the
+// south side that slide apart. (game.js moves the doors: they are kept in g.userData.doors.)
+function makeVault(p, g, x0, z0, wide, deep) {
+  const middle = padMid(p);
+  const W = wide * TILE;
+  const D = deep * TILE;
+  const high = 11;
+  const concrete = paint(0x8a8a92);
+  const darker = paint(0x5a5a64);
+  g.userData.postPaint = concrete;
+  const gapW = 13;                                    // how wide the doorway is
+  const south = z0 + D;
+  const add = function (w, h, d, x, y, z, material) {
+    const mesh = piece(g, new THREE.BoxGeometry(w, h, d), material || concrete, x, y, z);
+    mesh.castShadow = true;
+    return mesh;
+  };
+  add(W, high, 1.4, middle.x, high / 2, z0);                                        // north wall
+  add(1.4, high, D, x0, high / 2, middle.z);                                        // west wall
+  add(1.4, high, D, x0 + W, high / 2, middle.z);                                    // east wall
+  for (const s of [-1, 1]) add((W - gapW) / 2, high, 1.4, middle.x + s * (gapW / 2 + (W - gapW) / 4), high / 2, south);   // south wall, either side of the doors
+  add(gapW + 2, 2, 1.8, middle.x, high - 1, south, darker);                         // the beam over the doors
+  for (const sx of [0, 1]) {
+    for (const sz of [0, 1]) {
+      add(3.4, high + 3, 3.4, x0 + sx * W, (high + 3) / 2, z0 + sz * D, darker);
+      piece(g, ballShape, bright(0xff3a2a), x0 + sx * W, high + 3.5, z0 + sz * D).scale.setScalar(0.5);
+    }
+  }
+  // Yellow and black warning stripes along the bottom of the walls
+  for (let n = 0; n < wide; n++) add(TILE * 0.5, 0.8, 1.5, x0 + n * TILE + 2, 0.5, z0, bright(n % 2 ? 0xffd23a : 0x2a2a30));
+  // The two doors. When the vault has been smashed open, they lie flat on the ground.
+  g.userData.doors = [];
+  for (const s of [-1, 1]) {
+    const door = add(gapW / 2, high - 2, 0.9, middle.x + s * gapW / 4, (high - 2) / 2, south, paint(0x3a4a5a));
+    for (let n = 0; n < 3; n++) piece(door, new THREE.BoxGeometry(gapW / 2 - 0.4, 0.5, 1), bright(n % 2 ? 0x2a2a30 : 0xffd23a), 0, -3 + n * 3, 0.02);
+    if (p.breach) {
+      door.rotation.x = Math.PI / 2 - 0.1;
+      door.position.set(middle.x + s * gapW / 4, 0.6, south + 5 + s);
+    } else {
+      g.userData.doors.push({ mesh: door, shut: middle.x + s * gapW / 4, side: s, slide: gapW / 2 - 0.3 });
+    }
+  }
+  return g;
+}
+
+// Build the wall round a paddock: a fence, the edge of a lagoon, the net of an aviary,
+// the bars of a raptor den, or the concrete of a vault
 function makeFence(p) {
   const g = new THREE.Group();
   const x0 = p.i0 * TILE - HALF;
   const z0 = p.k0 * TILE - HALF;
   const wide = p.i1 - p.i0 + 1;
   const deep = p.k1 - p.k0 + 1;
-  const look = FENCE_LOOKS[p.fence];
-  const high = FENCES[p.fence].high;
+  if (p.kind === "water") return makeLagoon(p, g, x0, z0, wide, deep);
+  if (p.kind === "vault") return makeVault(p, g, x0, z0, wide, deep);
+  const look = p.kind === "land" ? FENCE_LOOKS[p.fence] : WALL_LOOKS[p.kind];
+  const high = p.kind === "land" ? FENCES[p.fence].high : look.high;
+  const electric = p.kind === "land" && p.fence === "electric";
   const postPaint = paint(look.post);
   g.userData.postPaint = postPaint;
-  const railPaint = p.fence === "electric" ? new THREE.MeshBasicMaterial({ color: look.rail }) : paint(look.rail);
+  const railPaint = electric ? new THREE.MeshBasicMaterial({ color: look.rail }) : paint(look.rail);
+  const middle = padMid(p);
+  if (p.kind === "air") {
+    // The aviary's net: a see-through dome of thin lines
+    const net = piece(g, new THREE.SphereGeometry(1, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: p.breach ? 0.15 : 0.45 }), middle.x, 3.8, middle.z);
+    net.scale.set(wide * TILE * 0.72, 13, deep * TILE * 0.72);
+    for (let n = 0; n < 3; n++) {
+      // Tall perches for them to land on
+      const px = middle.x + Math.cos(n * 2.1) * wide * 0.8;
+      const pz = middle.z + Math.sin(n * 2.1) * deep * 0.8;
+      piece(g, new THREE.CylinderGeometry(0.12, 0.2, 5, 6), paint(0x6a4a2a), px, 2.5, pz).castShadow = true;
+      piece(g, new THREE.BoxGeometry(2.2, 0.14, 0.14), paint(0x6a4a2a), px, 4.9, pz);
+    }
+  }
+  if (p.kind === "pit") {
+    // A roof of dark steel mesh (Needleback is a climber), and a red lamp on every corner
+    const roof = piece(g, new THREE.SphereGeometry(1, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x5a1a1a, wireframe: true, transparent: true, opacity: p.breach ? 0.2 : 0.8 }), middle.x, 6.6, middle.z);
+    roof.scale.set(wide * TILE * 0.71, 5, deep * TILE * 0.71);
+    for (const sx of [0, 1]) {
+      for (const sz of [0, 1]) {
+        piece(g, new THREE.BoxGeometry(1, 8, 1), postPaint, x0 + sx * wide * TILE, 4, z0 + sz * deep * TILE).castShadow = true;
+        piece(g, ballShape, bright(0xff2a1a), x0 + sx * wide * TILE, 8.4, z0 + sz * deep * TILE).scale.setScalar(0.45);
+      }
+    }
+    for (let n = 0; n < 5; n++) piece(g, new THREE.ConeGeometry(0.5, 2.4, 5), paint(0x4a4450), middle.x + Math.cos(n * 1.3) * wide * 1.1, 1.2, middle.z + Math.sin(n * 1.3) * deep * 1.1).castShadow = true;   // jagged rocks
+  }
+  if (p.kind === "den") {
+    // The den itself: a heap of big rocks with a dark cave mouth, in the back corner
+    const rock = [paint(0x7a7a80), paint(0x6a6a72), paint(0x8a8a8e)];
+    const dx = middle.x + wide * 0.9;
+    const dz = middle.z - deep * 0.9;
+    for (let n = 0; n < 7; n++) {
+      const lump = piece(g, new THREE.DodecahedronGeometry(1, 0), rock[n % 3], dx + Math.cos(n * 0.9) * 3.4, 1.6 + (n % 3) * 0.9, dz + Math.sin(n * 0.9) * 3);
+      lump.scale.set(3.2 - (n % 3) * 0.5, 2.6, 3);
+      lump.rotation.set(n, n * 2, 0);
+      lump.castShadow = true;
+    }
+    ball(g, bright(0x101014), 2, 1.8, 0.6, dx - 2.2, 1.5, dz + 3.3).rotation.y = 0.6;
+    for (let n = 0; n < 4; n++) piece(g, new THREE.CylinderGeometry(0.08, 0.08, 1.4, 5), paint(0xf0e8d0), middle.x - 6 + n * 1.5, 0.12, middle.z + 5 + (n % 2)).rotation.set(Math.PI / 2, 0, n);   // old bones
+  }
   // Every stretch of fence, one square long: { x, z, turned }
   const runs = [];
   for (let n = 0; n < wide; n++) {
@@ -276,7 +408,7 @@ function makeFence(p) {
   // All the posts are one shape drawn many times, and so are the rails (that is fast)
   const whole = runs.filter(function (run) { return !(p.breach && Math.hypot(run.x - p.breach.x, run.z - p.breach.z) < 4.2); });
   const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.36, high, 0.36), postPaint, runs.length);
-  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(TILE, p.fence === "electric" ? 0.07 : 0.2, 0.12), railPaint, whole.length * look.rails.length + runs.length);
+  const rails = new THREE.InstancedMesh(new THREE.BoxGeometry(TILE, electric || p.kind === "air" ? 0.07 : 0.2, 0.12), railPaint, whole.length * look.rails.length + runs.length);
   let railCount = 0;
   runs.forEach(function (run, n) {
     helper.scale.set(1, 1, 1);
@@ -342,7 +474,12 @@ function refreshPark() {
     parkGroup.add(model);
   }
   // Wild trees and rocks are hidden wherever something has been built on top of them
-  for (const key in wild) showWild(key, !state.tiles[key]);
+  // (and nothing grows in a lagoon, a pit or a vault)
+  for (const key in wild) {
+    const at = key.split(",").map(Number);
+    const pad = padAt(at[0], at[1]);
+    showWild(key, !state.tiles[key] && !(pad && (pad.kind === "water" || pad.kind === "pit" || pad.kind === "vault")));
+  }
   for (const id in padGroups) delete padGroups[id];
   for (const p of state.pads) {
     padGroups[p.id] = makeFence(p);
@@ -439,7 +576,7 @@ function padSeen(p) {
   return false;
 }
 
-const SHOP_MONEY = { snack: 8, gift: 15, diner: 25 };
+const SHOP_MONEY = { snack: 8, gift: 15, diner: 25, museum: 10 };
 
 // Everywhere a visitor might want to go: decks and shops they can get to
 function attractions() {
@@ -471,15 +608,17 @@ function rate() {
     if (seen[pad.id] === undefined) seen[pad.id] = padSeen(pad);
     if (!seen[pad.id]) continue;
     // The first of a kind is worth the most. More of the same kind are worth a bit less each.
-    points += SPECIES[d.kind].appeal * (kinds.has(d.kind) ? 0.5 : 1) * (0.4 + 0.6 * d.grow) * (d.comfort > 50 ? 1 : 0.5);
+    points += SPECIES[d.kind].appeal * padShow(pad) * (kinds.has(d.kind) ? 0.5 : 1) * (0.4 + 0.6 * d.grow) * (d.comfort > 50 ? 1 : 0.5);
     kinds.add(d.kind);
   }
   points += kinds.size * 3;
-  const shops = { snack: 0, gift: 0, diner: 0 };
+  const shops = { snack: 0, gift: 0, diner: 0, museum: 0 };
   for (const spot of attractions()) {
     if (shops[spot.type] !== undefined) shops[spot.type]++;
   }
   points += Math.min(shops.snack, 2) * 2 + Math.min(shops.gift, 2) * 3 + Math.min(shops.diner, 2) * 4;
+  // A museum is worth more the fuller your Dinodex is
+  points += Math.min(shops.museum, 2) * (3 + knownCount() / 12);
   // Pretty things add up (to a point). So does showing dinosaurs in more regions of the island.
   for (const key in state.tiles) pretty += TOOLS[state.tiles[key]].pretty || 0;
   points += Math.min(20, pretty);
@@ -541,7 +680,7 @@ function updateGuests(dt) {
     const g = guests[n];
     // Riding the monorail: out of sight until the train gets there
     if (g.ride > 0) {
-      g.ride -= dt;
+      if (state.time > state.raidUntil) g.ride -= dt;      // (the train does not move while Pteranodons are attacking it)
       continue;
     }
     // Run from any dinosaur that is on the loose!
@@ -575,13 +714,18 @@ function updateGuests(dt) {
         const pad = padBeside(g.goal.i, g.goal.k);
         if (pad) {
           for (const d of state.dinos) {
-            if (d.pad === pad.id && !d.loose && d.mood !== "egg") g.joy += SPECIES[d.kind].appeal * (0.4 + 0.6 * d.grow) * fun;
+            if (d.pad === pad.id && !d.loose && d.mood !== "egg") g.joy += SPECIES[d.kind].appeal * padShow(pad) * (0.4 + 0.6 * d.grow) * fun;
           }
         }
         g.wait = 5 + Math.random() * 4;
       } else if (g.goal) {
         state.money += SHOP_MONEY[g.goal.type];
-        g.wait = g.goal.type === "diner" ? 6 : 3;
+        if (g.goal.type === "museum") {
+          // The more fossils there are to see, the more they pay, and the more they enjoy it
+          state.money += Math.floor(knownCount() / 4);
+          g.joy += knownCount() * 0.25;
+        }
+        g.wait = g.goal.type === "diner" || g.goal.type === "museum" ? 6 : 3;
       } else {
         sendGuest(g);
       }

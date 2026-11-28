@@ -27,6 +27,7 @@ function freshState() {
     arrived: 0, served: 0, escapes: 0, caught: 0, trips: 0,
     goal: 0,          // which job you are on
     nextGuest: 3, nextStorm: 420, stormUntil: 0,
+    nextRaid: 240, raidUntil: 0,      // when wild Pteranodons will next attack the monorail
     won: false,
     jeep: { x: mid(GATE.i) + 8, z: HALF - 6, yaw: 0 },
   };
@@ -38,7 +39,7 @@ let state = freshState();
 let mode = "intro";          // intro, play or won
 let view = "park";           // "park" (looking down, building) or "jeep" (driving)
 let tool = "look";
-let group = "dinos";         // which tab of the toolbar is showing
+let group = "homes";         // which tab of the toolbar is showing
 let speed = 1;               // 0 = paused, 1 = normal, 3 = fast
 let selected = null;         // what the side panel is showing: { type: "pad" / "lab" / "staff", ... }
 let dexOpen = false;         // is the Dinodex showing? (The game waits while you read it.)
@@ -114,7 +115,9 @@ function goalDone(n) {
   if (n === 8) return state.best >= 3;
   if (n === 9) return knownCount() >= 40;
   if (n === 10) return state.best >= 5;
-  return knownCount() >= 100;
+  if (n === 11) return state.dinos.some(function (d) { return SPECIES[d.kind].home === "water"; }) && state.dinos.some(function (d) { return SPECIES[d.kind].home === "air"; });
+  if (n === 12) return state.dinos.some(function (d) { return d.kind === "h_overlord"; });
+  return knownCount() >= TOTAL;
 }
 
 function checkGoals() {
@@ -128,14 +131,14 @@ function checkGoals() {
     }
   }
   if (state.goal >= GOALS.length && !state.won) win();
-  el("goal").textContent = state.goal < GOALS.length ? "Job " + (state.goal + 1) + " of " + GOALS.length + ": " + GOALS[state.goal].text : "All 100 dinosaurs discovered! The island is yours to build any way you like";
+  el("goal").textContent = state.goal < GOALS.length ? "Job " + (state.goal + 1) + " of " + GOALS.length + ": " + GOALS[state.goal].text : "Every creature discovered! The island is yours to build any way you like";
 }
 
 function win() {
   state.won = true;
   sound(playJingle);
   save();
-  el("won-text").textContent = "You discovered all 100 dinosaurs, hybrids and all! Your park has " + state.dinos.length + " dinosaurs in " + state.pads.length + " paddocks, your teams went on " + state.trips + " expeditions, " + state.arrived + " visitors came, and you caught " + state.caught + " runaways. It took you " + Math.round(state.time / 60) + " minutes.";
+  el("won-text").textContent = "You discovered all " + TOTAL + " creatures, hybrids and all! Your park has " + state.dinos.length + " dinosaurs in " + state.pads.length + " paddocks, your teams went on " + state.trips + " expeditions, " + state.arrived + " visitors came, and you caught " + state.caught + " runaways. It took you " + Math.round(state.time / 60) + " minutes.";
   el("won").hidden = false;
   mode = "won";
 }
@@ -197,16 +200,26 @@ function padPanel(pad) {
   const biome = padBiome(pad);
   let room = 0;
   for (const d of here) room += SPECIES[d.kind].need;
-  let html = "<h2>Paddock " + (state.pads.indexOf(pad) + 1) + "</h2>";
+  let html = "<h2>" + PADS[pad.kind].name + " " + (state.pads.indexOf(pad) + 1) + "</h2>";
   html += '<p class="small">In ' + BIOMES[biome].name + ". " + (pad.i1 - pad.i0 + 1) + " by " + (pad.k1 - pad.k0 + 1) + " squares. Room used: " + room + " of " + padArea(pad) + ".<br>";
   html += padSeen(pad) ? "Visitors can see in." : '<span class="need">Visitors can\'t see in yet: put a viewing deck beside it, joined to a path.</span>';
   html += keptPads[pad.id] ? '<br><span class="got">A keeper is looking after it.</span>' : "";
   html += "</p>";
   const max = padMax(pad);
-  html += '<p class="small">' + FENCES[pad.fence].name + ": " + Math.ceil(pad.hp) + " of " + Math.round(max) + (pad.breach ? ' <span class="need">BROKEN!</span>' : "") + "</p>";
-  if (pad.hp < max) html += '<button data-act="fix"' + (state.money < fixCost(pad) ? " disabled" : "") + ">Mend it: $" + fixCost(pad) + "</button>";
-  for (const to of ["steel", "electric"]) {
-    if (FENCES[to].hp > FENCES[pad.fence].hp) html += '<button data-act="fence-' + to + '"' + (state.money < upgradeCost(pad, to) ? " disabled" : "") + ">Change to " + FENCES[to].name.toLowerCase() + ": $" + upgradeCost(pad, to) + "</button>";
+  if (pad.kind !== "water") {
+    const wallName = pad.kind === "land" ? FENCES[pad.fence].name : pad.kind === "air" ? "Net" : pad.kind === "vault" ? "Walls and doors" : "Bars";
+    html += '<p class="small">' + wallName + ": " + Math.ceil(pad.hp) + " of " + Math.round(max) + (pad.breach ? ' <span class="need">BROKEN!</span>' : "") + "</p>";
+    if (pad.hp < max) html += '<button data-act="fix"' + (state.money < fixCost(pad) ? " disabled" : "") + ">Mend it: $" + fixCost(pad) + "</button>";
+  }
+  if (pad.kind === "land") {
+    for (const to of ["steel", "electric"]) {
+      if (FENCES[to].hp > FENCES[pad.fence].hp) html += '<button data-act="fence-' + to + '"' + (state.money < upgradeCost(pad, to) ? " disabled" : "") + ">Change to " + FENCES[to].name.toLowerCase() + ": $" + upgradeCost(pad, to) + "</button>";
+    }
+  }
+  if (pad.kind === "vault" && !pad.breach) {
+    // The great doors: open for a show, shut for safety
+    html += '<p class="small">The doors are <b>' + (pad.open ? "OPEN" : "shut") + "</b>. " + (pad.open ? "Visitors get a wonderful view. But if anything in here gets angry, it will walk straight out!" : "Visitors can only hear what is inside. Open the doors to give them a show.") + "</p>";
+    html += '<button data-act="doors">' + (pad.open ? "Shut the doors" : "Open the doors") + "</button>";
   }
   html += "<h2>Dinosaurs</h2>";
   if (!here.length) html += '<p class="small">Nobody lives here yet.</p>';
@@ -224,14 +237,21 @@ function padPanel(pad) {
   }
   html += "<h2>Hatch an egg here</h2>";
   // The kinds you know, with the ones that like this region first, and then the cheapest first
-  const kinds = Object.keys(state.known).sort(function (a, b) {
+  // (Only the ones that can live in this sort of home.)
+  const fits = pad.kind === "water" ? "water" : pad.kind === "air" ? "air" : "land";
+  const kinds = Object.keys(state.known).filter(function (kind) {
+    const sp = SPECIES[kind];
+    if (sp.home !== fits || (pad.kind === "den" && sp.plan !== "R")) return false;
+    return !(sp.vault && pad.kind !== "vault") && !(sp.pit && pad.kind !== "pit" && pad.kind !== "vault");
+  }).sort(function (a, b) {
     return (SPECIES[a].biome === biome ? 0 : 1) - (SPECIES[b].biome === biome ? 0 : 1) || SPECIES[a].cost - SPECIES[b].cost;
   });
   for (const kind of kinds) {
     const sp = SPECIES[kind];
-    html += '<button class="egg" data-act="hatch-' + kind + '"' + (state.money < sp.cost ? " disabled" : "") + ">" + pic(kind) + "<span><b>" + sp.name + "</b> $" + sp.cost + "<br>Eats " + sp.diet + ". Needs " + sp.need + " squares" + (sp.herd > 1 ? " and " + (sp.herd - 1) + " friend" + (sp.herd > 2 ? "s" : "") : "") + "." + (sp.biome !== biome ? ' <span class="need">Likes ' + BIOMES[sp.biome].name + " best.</span>" : ' <span class="got">Likes it here.</span>') + "</span></button>";
+    html += '<button class="egg" data-act="hatch-' + kind + '"' + (state.money < sp.cost ? " disabled" : "") + ">" + pic(kind) + "<span><b>" + sp.name + "</b> $" + sp.cost + "<br>Eats " + sp.diet + ". Needs " + sp.need + " squares" + (sp.herd > 1 ? " and " + (sp.herd - 1) + " friend" + (sp.herd > 2 ? "s" : "") : "") + "." + (sp.biome !== biome && pad.kind !== "den" ? ' <span class="need">Likes ' + BIOMES[sp.biome].name + " best.</span>" : ' <span class="got">Likes it here.</span>') + "</span></button>";
   }
-  html += '<p class="small">' + (100 - kinds.length) + " more kinds are waiting to be discovered. Send out expeditions, drive the jeep to fossil sites, and make hybrids in a lab.</p>";
+  if (!kinds.length) html += '<p class="small">You have not discovered anything that can live in ' + (fits === "water" ? "a lagoon" : fits === "air" ? "an aviary" : "here") + " yet.</p>";
+  html += '<p class="small">' + (TOTAL - knownCount()) + " more kinds are waiting to be discovered. Send out expeditions, drive the jeep to fossil sites, and make hybrids in a lab.</p>";
   return html;
 }
 
@@ -304,6 +324,9 @@ function panelAct(act) {
     attempt(startResearch(selected.key, act.slice(4)));
   } else if (!pad) {
     return;
+  } else if (act === "doors") {
+    pad.open = !pad.open;
+    sound(function () { playNoise(0, 0.9, 200, 90, 0.3); playTone(0, 0.9, 80, 60, 0.2); });
   } else if (act === "fix") {
     const cost = fixCost(pad);
     if (state.money >= cost) {
@@ -344,13 +367,17 @@ function drawAlerts() {
   for (const pad of state.pads) {
     const angry = state.dinos.filter(function (d) { return d.pad === pad.id && d.mood === "angry" && !d.loose; });
     if (!angry.length) continue;
-    lines.push('<p class="bad" data-pad="' + pad.id + '">' + SPECIES[angry[0].kind].name + " in paddock " + (state.pads.indexOf(pad) + 1) + " is ANGRY and bashing the fence (" + Math.round(pad.hp / padMax(pad) * 100) + "% left). Click here to see why.</p>");
+    lines.push('<p class="bad" data-pad="' + pad.id + '">' + SPECIES[angry[0].kind].name + " in paddock " + (state.pads.indexOf(pad) + 1) + " is ANGRY" + (pad.kind === "water" ? "" : " and bashing its way out (" + Math.round(pad.hp / padMax(pad) * 100) + "% left)") + ". Click here to see why.</p>");
   }
   // Hungry dinosaurs with no feeder, and fences that are nearly broken
   for (const pad of state.pads) {
     const hungry = state.dinos.find(function (d) { return d.pad === pad.id && !d.loose && d.mood === "calm" && d.hunger < 30 && !feedersIn(pad, SPECIES[d.kind].diet).length; });
     if (hungry) lines.push('<p data-pad="' + pad.id + '">' + SPECIES[hungry.kind].name + " in paddock " + (state.pads.indexOf(pad) + 1) + " is hungry and has no " + (SPECIES[hungry.kind].diet === "plants" ? "plant" : SPECIES[hungry.kind].diet) + " feeder. Click here.</p>");
     else if (pad.hp < padMax(pad) * 0.35 && !state.dinos.some(function (d) { return d.pad === pad.id && d.mood === "angry"; })) lines.push('<p data-pad="' + pad.id + '">The fence of paddock ' + (state.pads.indexOf(pad) + 1) + " is " + (pad.breach ? "BROKEN" : "nearly broken") + ". Click here to mend it.</p>");
+  }
+  if (raiding()) lines.push('<p class="bad" data-train="1">Wild Pteranodons are attacking the monorail! ' + (state.staff.ranger ? "A ranger is on the way." : "Drive the jeep to the train and press Space.") + ' <button data-act="flares"' + (state.money < 150 ? " disabled" : "") + ">Fire flares: $150</button></p>");
+  for (const pad of state.pads) {
+    if (pad.kind === "vault" && pad.open && state.dinos.some(function (d) { return d.pad === pad.id && d.mood === "angry" && !d.loose; })) lines.push('<p class="bad" data-pad="' + pad.id + '">The vault doors are OPEN and something inside is ANGRY! Click here and shut them!</p>');
   }
   if (stormy()) lines.push("<p>STORM! Electric fences have no power" + (state.tech.shelter ? "." : ", and the dinosaurs are frightened.") + "</p>");
   else if (state.dinos.length && state.nextStorm - state.time < 25 && state.nextStorm > state.time) lines.push("<p>A storm is coming. Check your fences!</p>");
@@ -409,6 +436,10 @@ function dartTarget() {
 function fireDart() {
   if (state.time < dartReady) return;
   const target = dartTarget();
+  if (!target && raiding() && Math.hypot(trainCars[0].position.x - state.jeep.x, trainCars[0].position.z - state.jeep.z) < 70) {
+    soundDart();
+    return endRaid("Your dart whistles past them, and the Pteranodons flee!");
+  }
   if (!target) return say("No angry or loose dinosaur is close enough in front of the jeep", 2);
   dartReady = state.time + 1.2;
   soundDart();
@@ -515,6 +546,7 @@ function tick(dt) {
   updateDinos(dt);
   updateGuests(dt);
   updateStaff(dt);
+  updateFlock(dt);
   updateWeather(dt);
   moveTrain(dt);
   if (view === "jeep") {
@@ -577,6 +609,18 @@ function setTool(name) {
   }
 }
 
+// The squares a new paddock would cover. Most are a box you drag out with the mouse.
+// Dens, pits and vaults always come the same size, centred on the square you point at.
+function padBox(from, to, kind) {
+  const side = PADS[kind].side;
+  if (side) {
+    const i0 = to.i - Math.floor(side / 2);
+    const k0 = to.k - Math.floor(side / 2);
+    return { i0: i0, k0: k0, i1: i0 + side - 1, k1: k0 + side - 1 };
+  }
+  return { i0: Math.min(from.i, to.i), k0: Math.min(from.k, to.k), i1: Math.max(from.i, to.i), k1: Math.max(from.k, to.k) };
+}
+
 // A click (or the end of a drag) with the tool you are holding
 function useTool(spot) {
   if (!spot) return;
@@ -587,7 +631,8 @@ function useTool(spot) {
     panelText = "";
   } else if (TOOLS[tool].pad) {
     if (!drag) return;
-    attempt(buildPad(Math.min(drag.i, spot.i), Math.min(drag.k, spot.k), Math.max(drag.i, spot.i), Math.max(drag.k, spot.k), TOOLS[tool].pad));
+    const at = padBox(drag, spot, TOOLS[tool].pad);
+    attempt(buildPad(at.i0, at.k0, at.i1, at.k1, TOOLS[tool].pad));
   } else if (tool === "remove") {
     attempt(removeAt(spot.i, spot.k));
   } else if (tool !== "path") {
@@ -665,7 +710,7 @@ function drawDex() {
     html += "</div>";
   }
   el("dex-list").innerHTML = html;
-  el("dex-count").textContent = knownCount() + " of 100 discovered";
+  el("dex-count").textContent = knownCount() + " of " + TOTAL + " discovered";
   el("dex-info").innerHTML = "Click a dinosaur to read about it.";
 }
 
@@ -740,10 +785,20 @@ el("panel").addEventListener("click", function (e) {
 });
 el("alerts").addEventListener("click", function (e) {
   const button = e.target.closest("button");
+  if (button && button.dataset.act === "flares") {
+    if (state.money >= 150) {
+      state.money -= 150;
+      endRaid("Whoosh! The flares send the Pteranodons flapping back to the volcano.");
+    }
+    return;
+  }
   if (button) return sendRangers();
   const line = e.target.closest("p");
   if (!line) return;
-  if (line.dataset.pad) {
+  if (line.dataset.train && view === "park") {
+    cam.x = trainCars[0].position.x;
+    cam.z = trainCars[0].position.z;
+  } else if (line.dataset.pad) {
     // Jump to the paddock and open its panel
     const pad = padById(Number(line.dataset.pad));
     if (!pad) return;
@@ -828,7 +883,7 @@ function drawMap() {
     pen.fillRect(n[0], n[1], 1.5, 1.5);
   }
   for (const pad of state.pads) {
-    pen.strokeStyle = "#5a3a1a";
+    pen.strokeStyle = { land: "#5a3a1a", water: "#1a5a9a", air: "#ffffff", den: "#3a3a44", pit: "#8a1a1a", vault: "#000000" }[pad.kind];
     pen.lineWidth = 1.5;
     pen.strokeRect(pad.i0, pad.k0, pad.i1 - pad.i0 + 1, pad.k1 - pad.k0 + 1);
   }
@@ -877,7 +932,7 @@ function drawHud() {
   setText("crowd", guests.length + " visitors");
   setText("place", BIOMES[biome].name);
   const fresh = Object.keys(state.fresh).length;
-  setText("dex-open", "B: Dinodex " + knownCount() + "/100" + (fresh ? " <b>NEW!</b>" : ""));
+  setText("dex-open", "B: Dinodex " + knownCount() + "/" + TOTAL + (fresh ? " <b>NEW!</b>" : ""));
   for (const n of [0, 1, 3]) el("speed" + n).classList.toggle("on", speed === n);
   setText("jeep", view === "jeep" ? "J: park" : "J: jeep");
 
@@ -897,11 +952,12 @@ function drawHud() {
     }
   } else if (mode === "play") {
     hint = TOOLS[tool].what;
-    if (TOOLS[tool].pad && drag && hover) {
-      const wide = Math.abs(hover.i - drag.i) + 1;
-      const deep = Math.abs(hover.k - drag.k) + 1;
-      const why = whyNoPad(Math.min(drag.i, hover.i), Math.min(drag.k, hover.k), Math.max(drag.i, hover.i), Math.max(drag.k, hover.k), TOOLS[tool].pad);
-      hint = wide + " by " + deep + " paddock: $" + 2 * (wide + deep) * PADS[TOOLS[tool].pad].per + (why ? " · " + why : "");
+    if (TOOLS[tool].pad && hover && (drag || PADS[TOOLS[tool].pad].side)) {
+      const at = padBox(drag || hover, hover, TOOLS[tool].pad);
+      const wide = at.i1 - at.i0 + 1;
+      const deep = at.k1 - at.k0 + 1;
+      const why = whyNoPad(at.i0, at.k0, at.i1, at.k1, TOOLS[tool].pad);
+      hint = wide + " by " + deep + " " + PADS[TOOLS[tool].pad].name.toLowerCase() + ": $" + 2 * (wide + deep) * PADS[TOOLS[tool].pad].per + (why ? " · " + why : "");
     } else if (hover && TOOLS[tool].cost && whyNot(tool, hover.i, hover.k)) {
       hint = whyNot(tool, hover.i, hover.k);
     }
@@ -998,14 +1054,11 @@ function draw(dt) {
   if (lines.visible && hover && inPark(hover.i, hover.k)) {
     cursor.visible = true;
     let bad;
-    if (TOOLS[tool].pad && drag) {
-      const i0 = Math.min(drag.i, hover.i);
-      const i1 = Math.max(drag.i, hover.i);
-      const k0 = Math.min(drag.k, hover.k);
-      const k1 = Math.max(drag.k, hover.k);
-      cursor.position.set((i0 + i1 + 1) / 2 * TILE - HALF, 0.2, (k0 + k1 + 1) / 2 * TILE - HALF);
-      cursor.scale.set((i1 - i0 + 1) * TILE, 1, (k1 - k0 + 1) * TILE);
-      bad = whyNoPad(i0, k0, i1, k1, TOOLS[tool].pad);
+    if (TOOLS[tool].pad && (drag || PADS[TOOLS[tool].pad].side)) {
+      const at = padBox(drag || hover, hover, TOOLS[tool].pad);
+      cursor.position.set((at.i0 + at.i1 + 1) / 2 * TILE - HALF, 0.2, (at.k0 + at.k1 + 1) / 2 * TILE - HALF);
+      cursor.scale.set((at.i1 - at.i0 + 1) * TILE, 1, (at.k1 - at.k0 + 1) * TILE);
+      bad = whyNoPad(at.i0, at.k0, at.i1, at.k1, TOOLS[tool].pad);
     } else {
       cursor.position.set(mid(hover.i), 0.2, mid(hover.k));
       cursor.scale.set(TILE, 1, TILE);
@@ -1017,13 +1070,20 @@ function draw(dt) {
   // A fence that is being bashed flashes red
   for (const pad of state.pads) {
     const fence = padGroups[pad.id];
-    if (fence) fence.userData.postPaint.emissive.setHex(state.time - (pad.hitAt || -9) < 0.5 && Math.sin(wall * 20) > 0 ? 0xaa1a0a : 0x000000);
+    if (!fence) continue;
+    fence.userData.postPaint.emissive.setHex(state.time - (pad.hitAt || -9) < 0.5 && Math.sin(wall * 20) > 0 ? 0xaa1a0a : 0x000000);
+    // A vault's doors slide slowly apart, or back together
+    for (const door of fence.userData.doors || []) {
+      const to = door.shut + (pad.open ? door.side * door.slide : 0);
+      door.mesh.position.x += (to - door.mesh.position.x) * Math.min(1, dt * 1.5);
+    }
   }
 
   poseDinos(wall);
   drawGuests(wall);
   drawStaff(wall);
   drawTrips(dt * (mode === "play" && !dexOpen ? speed : 0));
+  drawFlock(wall);
   drawHud();
 }
 
@@ -1068,7 +1128,7 @@ function begin(saved) {
   showDex(false);
   view = "park";
   el("toolbar").hidden = false;
-  group = "dinos";
+  group = "homes";
   tool = "look";
   drawToolbar();
   selected = null;

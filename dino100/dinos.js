@@ -32,6 +32,12 @@ function sweepDinos() {
 function hatch(kind, pad) {
   const sp = SPECIES[kind];
   if (!state.known[kind]) return "You have not discovered that dinosaur yet";
+  // Every creature needs the right kind of home
+  const fits = pad.kind === "water" ? "water" : pad.kind === "air" ? "air" : "land";
+  if (sp.home !== fits) return sp.name + " needs " + (sp.home === "water" ? "a lagoon" : sp.home === "air" ? "an aviary" : "a paddock on dry land");
+  if (pad.kind === "den" && sp.plan !== "R") return "Only raptors can live in a raptor den";
+  if (sp.vault && pad.kind !== "vault") return sp.name + " is far too strong for that. Only a Titan Vault can hold it";
+  if (sp.pit && pad.kind !== "pit" && pad.kind !== "vault") return sp.name + " would climb straight out of that. It needs a Needle Pit, which has a roof";
   if (state.money < sp.cost) return "You need $" + sp.cost;
   state.money -= sp.cost;
   const middle = padMid(pad);
@@ -85,7 +91,9 @@ function feel(d, pad, dt) {
     comfort -= 65;
     why.push("scared: there is a meat-eater in here!");
   }
-  if (padBiome(pad) !== sp.biome) {
+  if (pad.kind === "den") {
+    comfort += 12;       // raptors feel safe in a den, wherever it is
+  } else if (pad.kind !== "pit" && pad.kind !== "vault" && padBiome(pad) !== sp.biome) {
     comfort -= 20;
     why.push("not quite at home: it likes " + BIOMES[sp.biome].name + " best");
   }
@@ -96,7 +104,7 @@ function feel(d, pad, dt) {
   // A keeper looking after this paddock cheers everybody up
   if (keptPads[pad.id]) comfort = Math.min(100, comfort + 18);
   d.why = why;
-  d.comfort += (comfort - d.comfort) * Math.min(1, dt * 0.25);
+  d.comfort += (Math.min(100, comfort) - d.comfort) * Math.min(1, dt * 0.25);
 }
 
 // Turn towards a spot and walk at it. Gives back how far away it still is.
@@ -156,6 +164,15 @@ function graze(d, pad, L, dt) {
 // Angry: walk to the nearest bit of fence and bash it
 function ram(d, pad, L, dt) {
   const sp = SPECIES[d.kind];
+  if (pad.kind === "vault" && !pad.breach) {
+    // A vault's only weak spot is its doors. If they are standing open, it just walks out!
+    const door = { x: padMid(pad).x, z: (pad.k1 + 1) * TILE - HALF };
+    L.ramSpot = door;
+    if (pad.open) {
+      if (walkTo(d, L, door.x, door.z + 3, sp.speed, dt) < 2) setLoose(d);
+      return;
+    }
+  }
   if (pad.breach) {
     // The fence is already broken: straight out through the gap
     if (walkTo(d, L, pad.breach.x, pad.breach.z, sp.speed, dt) < 1.5) setLoose(d);
@@ -173,7 +190,7 @@ function ram(d, pad, L, dt) {
   if (walkTo(d, L, L.ramSpot.x, L.ramSpot.z, sp.speed * 0.8, dt) > 1.2 + SHAPES[d.kind].long * 0.2) return;
   L.ram += dt;
   // A storm cuts the power, and an electric fence with no power is easy to break
-  const weak = stormy() && pad.fence === "electric" ? 3 : 1;
+  const weak = stormy() && pad.kind === "land" && pad.fence === "electric" ? 3 : 1;
   pad.hp -= sp.strength * dt * weak;
   pad.hitAt = state.time;
   if (pad.hp > 0) return;
@@ -270,6 +287,7 @@ function liftHome(d, L, dt) {
     d.comfort = 70;
     d.hunger = Math.max(d.hunger, 70);
     pad.breach = null;
+    pad.open = false;                 // (a vault's doors are shut behind it)
     pad.hp = Math.max(pad.hp, padMax(pad) * 0.6);
     refreshPark();
     state.caught++;
@@ -290,7 +308,7 @@ function updateDinos(dt) {
       if (state.time > d.hatchAt) {
         d.mood = "calm";
         soundHatch();
-        say("A baby " + SPECIES[d.kind].name + " has hatched!", 4);
+        say((SPECIES[d.kind].name.indexOf("The ") === 0 ? SPECIES[d.kind].name : "A baby " + SPECIES[d.kind].name) + " has hatched!", 4);
       }
       continue;
     }
@@ -322,7 +340,8 @@ function updateDinos(dt) {
       d.mood = "calm";
       L.ramSpot = null;
     }
-    if (d.mood === "angry") ram(d, pad, L, dt);
+    // (Sea reptiles can't climb out of a lagoon, however cross they are.)
+    if (d.mood === "angry" && pad.kind !== "water") ram(d, pad, L, dt);
     else graze(d, pad, L, dt);
   }
 }
@@ -353,7 +372,13 @@ function poseDinos(t) {
     const big = 0.35 + 0.65 * d.grow;
     const asleep = d.mood === "asleep" || d.mood === "lift";
     m.group.scale.setScalar(big);
-    m.group.position.set(d.x, (d.mood === "lift" ? L.up || 0 : 0) + (asleep ? SHAPES[d.kind].long * 0.08 * big : 0), d.z);
+    // Flying reptiles stay up in the air, and sea reptiles float low in the water
+    const home = SPECIES[d.kind].home;
+    let high = 0;
+    if (home === "air" && !asleep) high = 4 + SHAPES[d.kind].long * 0.15 + Math.sin(t * 0.7 + d.id) * 1.2;
+    else if (home === "water" && !d.loose) high = -SHAPES[d.kind].tall * 0.55 * big + Math.sin(t * 1.1 + d.id) * 0.12;
+    L.high = high;
+    m.group.position.set(d.x, high + (d.mood === "lift" ? L.up || 0 : 0) + (asleep ? SHAPES[d.kind].long * 0.08 * big : 0), d.z);
     m.group.rotation.set(0, d.yaw, asleep ? 1.35 : 0);
     // Legs swing when it walks. (Legs come in pairs: left and right swing opposite ways.)
     const stride = L.moving ? Math.sin(t * (4 + L.moving * 1.2) + d.id) * 0.5 : 0;
@@ -364,13 +389,16 @@ function poseDinos(t) {
     // Head down to eat, or thrown forward to bash the fence
     const bash = d.mood === "angry" && L.ram > 0 && !d.loose ? Math.max(0, Math.sin(t * 7)) * 0.35 : 0;
     m.head.rotation.x = L.eating > 0 ? -0.5 - Math.sin(t * 6) * 0.08 : -bash;
+    if (m.wings) {
+      for (const wing of m.wings) wing.group.rotation.z = wing.side * (asleep ? -0.25 : Math.sin(t * 5 + d.id) * 0.5);
+    }
     if (m.jaw) m.jaw.rotation.x = d.mood === "angry" ? -0.35 - Math.sin(t * 5) * 0.15 : -0.05;
     // A little sign over its head
     const sign = d.mood === "angry" ? "angry" : asleep ? "asleep" : d.hunger < 30 ? "hungry" : null;
     L.sign.visible = !!sign;
     if (sign) {
       L.sign.material = SIGNS[sign];
-      L.sign.position.set(d.x, SHAPES[d.kind].tall * big + 2 + (L.up || 0), d.z);
+      L.sign.position.set(d.x, SHAPES[d.kind].tall * big + 2 + (L.up || 0) + Math.max(0, L.high || 0), d.z);
       L.sign.scale.setScalar(3 + Math.sin(t * 6) * 0.3);
     }
   }
